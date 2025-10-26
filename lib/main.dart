@@ -580,7 +580,7 @@ class _CardGameScreenState extends State<CardGameScreen> with TickerProviderStat
       backgroundColor: const Color(0xFF0F5132), // Dark green like a card table
       appBar: AppBar(
         title: const Text(
-          'BlueCard Game',
+          '',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF0A4025),
