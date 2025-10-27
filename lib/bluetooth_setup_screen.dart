@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'bluetooth_service.dart';
 import 'debug_service.dart';
+import 'settings_screen.dart';
 
 class BluetoothSetupScreen extends StatefulWidget {
   const BluetoothSetupScreen({Key? key}) : super(key: key);
@@ -19,6 +20,7 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
     _bluetoothService.addListener(_onBluetoothStateChanged);
     _bluetoothService.onPlayerConnected = _onPlayerConnected;
     _bluetoothService.onPlayerDisconnected = _onPlayerDisconnected;
+    _bluetoothService.onMessageReceived = _handleGameMessage;
   }
 
   @override
@@ -28,16 +30,21 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
   }
 
   void _onBluetoothStateChanged() {
+    DebugService().log('🔄 Bluetooth state changed to: ${_bluetoothService.state}');
     setState(() {});
   }
 
   void _onPlayerConnected(String playerId) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Player connected: $playerId'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    // Only show "Player connected" for hosts when clients join
+    // Don't show it for clients when they successfully connect
+    if (_bluetoothService.isHost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Player connected: $playerId'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   void _onPlayerDisconnected(String playerId) {
@@ -49,24 +56,56 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
     );
   }
 
+  void _handleGameMessage(GameMessage message) {
+    switch (message.type) {
+      case GameMessageType.gameState:
+        // Update game state from host
+        break;
+      case GameMessageType.playCard:
+        // Handle card play from other player
+        break;
+      case GameMessageType.drawCard:
+        // Handle card draw from other player
+        break;
+      case GameMessageType.nextTurn:
+        // Move to next turn
+        break;
+      case GameMessageType.playerJoined:
+        // New player joined
+        break;
+      case GameMessageType.playerLeft:
+        // Player left game
+        break;
+      case GameMessageType.ping:
+        // Handle ping message - just log it for now
+        DebugService().log('🏓 Received ping from ${message.playerId}');
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F5132),
       appBar: AppBar(
         title: const Text(
-          'Bluetooth Multiplayer',
+          '',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF0A4025),
         elevation: 0,
-        leading: IconButton(
-          onPressed: () {
-            _bluetoothService.disconnect();
-            Navigator.pop(context);
-          },
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-        ),
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+            icon: const Icon(Icons.settings, color: Colors.white),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -103,6 +142,13 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
             
             const SizedBox(height: 30),
             
+            // Debug state display
+            Text(
+              'Current State: ${_bluetoothService.state}',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+            
             // Action buttons
             if (_bluetoothService.state == BluetoothGameState.disconnected) ...[
               ElevatedButton.icon(
@@ -136,86 +182,233 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
                   ),
                 ),
               ),
-              
-              const SizedBox(height: 16),
-              
-              OutlinedButton.icon(
-                onPressed: _showDebugWindow,
-                icon: const Icon(Icons.bug_report),
-                label: const Text('DEBUG LOG'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.grey[700],
-                  side: BorderSide(color: Colors.grey[400]!),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  textStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+            ],
+            
+            // Starting host loading screen
+            if (_bluetoothService.state == BluetoothGameState.startingHost) ...[
+              const Center(
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(
+                    color: Colors.green,
                   ),
                 ),
               ),
-            ],
-            
-            // Host waiting screen
-            if (_bluetoothService.state == BluetoothGameState.hosting) ...[
+              const SizedBox(height: 16),
               const Text(
-                '🎮 Game Host Active!',
-                style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              
-              const SizedBox(height: 10),
-              
-              const Text(
-                'Your device is now discoverable.\nOther players can find and join your game.',
+                'Starting Game Host...',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 16,
                 ),
                 textAlign: TextAlign.center,
               ),
-              
-              const SizedBox(height: 20),
-              
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue, width: 1),
+              const SizedBox(height: 8),
+              const Text(
+                'Setting up Bluetooth advertising',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
                 ),
-                child: const Column(
-                  children: [
-                    Icon(Icons.info, color: Colors.blue, size: 24),
-                    SizedBox(height: 8),
-                    Text(
-                      'Players should tap "JOIN GAME" on their devices to find and connect to your game.',
-                      style: TextStyle(color: Colors.white, fontSize: 14),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+                textAlign: TextAlign.center,
               ),
-              
-              const SizedBox(height: 20),
-              
-              ElevatedButton(
-                onPressed: _startGame,
-                child: const Text('START GAME'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+            ],
+            
+            // Host waiting screen
+            if (_bluetoothService.state == BluetoothGameState.hosting)
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue, width: 1),
+                        ),
+                        child: const Column(
+                          children: [
+                            Icon(Icons.info, color: Colors.blue, size: 24),
+                            SizedBox(height: 8),
+                            Text(
+                              'Players should tap "JOIN GAME" on their devices to find and connect to your game.',
+                              style: TextStyle(color: Colors.white, fontSize: 14),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Connected Clients Section
+                      if (_bluetoothService.connectedClients.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green, width: 1),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.people, color: Colors.green, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Connected Players (${_bluetoothService.connectedClients.length})',
+                                    style: const TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              ..._bluetoothService.connectedClients.map((client) => 
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 2),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.person, color: Colors.white70, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        client['name'] ?? 'Unknown Player',
+                                        style: const TextStyle(color: Colors.white),
+                                      ),
+                                      const Spacer(),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Text(
+                                          'ONLINE',
+                                          style: TextStyle(
+                                            color: Colors.green,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ).toList(),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      
+                      // Ping History Section
+                      if (_bluetoothService.pingHistory.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue, width: 1),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.timeline, color: Colors.blue, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Ping History (${_bluetoothService.pingHistory.length})',
+                                    style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              // Make ping history scrollable and taller
+                              SizedBox(
+                                height: 200,
+                                child: ListView.builder(
+                                  itemCount: _bluetoothService.pingHistory.length,
+                                  itemBuilder: (context, index) {
+                                    final ping = _bluetoothService.pingHistory[index];
+                                    final timestamp = ping['timestamp'] as DateTime;
+                                    final timeString = '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}';
+                                    final direction = ping['direction'] as String;
+                                    final playerId = ping['playerId'] as String;
+                                    final message = ping['message'] as String;
+                                    
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 1),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            direction == 'sent' ? Icons.arrow_upward : Icons.arrow_downward,
+                                            color: direction == 'sent' ? Colors.orange : Colors.green,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            timeString,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                              fontFamily: 'monospace',
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '${direction == 'sent' ? 'To' : 'From'} $playerId: $message',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      
+                      ElevatedButton(
+                        onPressed: _startGame,
+                        child: const Text('START GAME'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          textStyle: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20), // Extra bottom padding
+                    ],
                   ),
                 ),
               ),
-            ],
             
             // Client scanning/device list
             if (_bluetoothService.state == BluetoothGameState.scanning) ...[
@@ -248,8 +441,12 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            CircularProgressIndicator(
-                              color: Colors.blue,
+                            SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: CircularProgressIndicator(
+                                color: Colors.blue,
+                              ),
                             ),
                             SizedBox(height: 16),
                             Text(
@@ -321,6 +518,85 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
+              
+              const SizedBox(height: 20),
+              
+              // Ping History Section for Client
+              if (_bluetoothService.pingHistory.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.purple, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.sync_alt, color: Colors.purple, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Connection Activity (${_bluetoothService.pingHistory.length})',
+                            style: const TextStyle(
+                              color: Colors.purple,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 100,
+                        child: ListView.builder(
+                          itemCount: _bluetoothService.pingHistory.length,
+                          itemBuilder: (context, index) {
+                            final ping = _bluetoothService.pingHistory[index];
+                            final timestamp = ping['timestamp'] as DateTime;
+                            final timeString = '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}';
+                            final direction = ping['direction'] as String;
+                            
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 1),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    direction == 'sent' ? Icons.arrow_upward : Icons.arrow_downward,
+                                    color: direction == 'sent' ? Colors.orange : Colors.green,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    timeString,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      '${direction == 'sent' ? 'Ping sent' : 'Ping from host'}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
             
             const SizedBox(height: 20),
@@ -352,6 +628,8 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
         return Icons.bluetooth_connected;
       case BluetoothGameState.connected:
         return Icons.bluetooth_connected;
+      case BluetoothGameState.startingHost:
+        return Icons.wifi_tethering;
       case BluetoothGameState.hosting:
         return Icons.wifi_tethering;
     }
@@ -367,6 +645,8 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
         return Colors.orange;
       case BluetoothGameState.connected:
         return Colors.green;
+      case BluetoothGameState.startingHost:
+        return Colors.orange;
       case BluetoothGameState.hosting:
         return Colors.green;
     }
@@ -382,30 +662,36 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
         return 'Connecting...';
       case BluetoothGameState.connected:
         return 'Connected to Game';
+      case BluetoothGameState.startingHost:
+        return 'Starting Host...';
       case BluetoothGameState.hosting:
         return 'Hosting Game';
     }
   }
 
   Future<void> _startHosting() async {
-    await _bluetoothService.startHosting();
+    DebugService().log('🎯 Host Game button pressed!');
+    try {
+      await _bluetoothService.startHosting();
+      DebugService().log('✅ Host Game button completed successfully');
+    } catch (e) {
+      DebugService().log('❌ Host Game button error: $e');
+    }
   }
 
   Future<void> _startScanning() async {
     await _bluetoothService.scanForHosts();
   }
 
-  void _showDebugWindow() {
-    showDialog(
-      context: context,
-      builder: (context) => const DebugWindow(),
-    );
-  }
-
   Future<void> _connectToDevice(BluetoothDevice device) async {
     final success = await _bluetoothService.connectToHost(device);
     if (success) {
-      // Wait for game to start
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Connected to ${device.platformName}'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -420,7 +706,10 @@ class _BluetoothSetupScreenState extends State<BluetoothSetupScreen> {
     _bluetoothService.disconnect();
   }
 
-  void _startGame() {
+  void _startGame() async {
+    // Start the game via bluetooth service (this sends messages to clients and starts host pings)
+    await _bluetoothService.startGame();
+    
     // Navigate to game screen with Bluetooth mode
     Navigator.pushReplacement(
       context,
@@ -440,35 +729,6 @@ class BluetoothGameScreen extends StatefulWidget {
 
 class _BluetoothGameScreenState extends State<BluetoothGameScreen> {
   final BluetoothGameService _bluetoothService = BluetoothGameService();
-
-  @override
-  void initState() {
-    super.initState();
-    _bluetoothService.onMessageReceived = _handleGameMessage;
-  }
-
-  void _handleGameMessage(GameMessage message) {
-    switch (message.type) {
-      case GameMessageType.gameState:
-        // Update game state from host
-        break;
-      case GameMessageType.playCard:
-        // Handle card play from other player
-        break;
-      case GameMessageType.drawCard:
-        // Handle card draw from other player
-        break;
-      case GameMessageType.nextTurn:
-        // Move to next turn
-        break;
-      case GameMessageType.playerJoined:
-        // New player joined
-        break;
-      case GameMessageType.playerLeft:
-        // Player left game
-        break;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

@@ -21,6 +21,15 @@ class BlePeripheralManager(private val context: Context) {
     private var gameCharacteristic: BluetoothGattCharacteristic? = null
     private var connectedDevices = mutableSetOf<BluetoothDevice>()
     
+    // Callback interface for connection events
+    interface ConnectionCallback {
+        fun onClientConnected(deviceName: String, deviceAddress: String)
+        fun onClientDisconnected(deviceName: String, deviceAddress: String)
+        fun onDataReceived(deviceAddress: String, data: String)
+    }
+    
+    var connectionCallback: ConnectionCallback? = null
+    
     init {
         bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager?.adapter
@@ -161,6 +170,15 @@ class BlePeripheralManager(private val context: Context) {
         }
     }
     
+    fun getConnectedClients(): List<Map<String, String>> {
+        return connectedDevices.map { device ->
+            mapOf(
+                "name" to (device.name ?: "Unknown Device"),
+                "address" to device.address
+            )
+        }
+    }
+    
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
             super.onStartSuccess(settingsInEffect)
@@ -193,13 +211,25 @@ class BlePeripheralManager(private val context: Context) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     device?.let {
                         connectedDevices.add(it)
-                        Log.i(TAG, "✅ Client connected: ${it.name ?: it.address}")
+                        val deviceName = it.name ?: "Unknown Device"
+                        val deviceAddress = it.address
+                        Log.i(TAG, "✅ Client connected: $deviceName ($deviceAddress)")
+                        Log.i(TAG, "📊 Total connected clients: ${connectedDevices.size}")
+                        
+                        // Notify Flutter via callback
+                        connectionCallback?.onClientConnected(deviceName, deviceAddress)
                     }
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     device?.let {
                         connectedDevices.remove(it)
-                        Log.i(TAG, "❌ Client disconnected: ${it.name ?: it.address}")
+                        val deviceName = it.name ?: "Unknown Device"
+                        val deviceAddress = it.address
+                        Log.i(TAG, "❌ Client disconnected: $deviceName ($deviceAddress)")
+                        Log.i(TAG, "📊 Total connected clients: ${connectedDevices.size}")
+                        
+                        // Notify Flutter via callback
+                        connectionCallback?.onClientDisconnected(deviceName, deviceAddress)
                     }
                 }
             }
@@ -245,7 +275,11 @@ class BlePeripheralManager(private val context: Context) {
                 value?.let {
                     val data = String(it)
                     Log.i(TAG, "📨 Received data from ${device?.address}: $data")
-                    // Here you could notify Flutter about received data
+                    
+                    // Notify Flutter about received data
+                    device?.address?.let { deviceAddress ->
+                        connectionCallback?.onDataReceived(deviceAddress, data)
+                    }
                 }
                 
                 if (responseNeeded) {

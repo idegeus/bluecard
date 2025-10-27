@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'bluetooth_setup_screen.dart';
 import 'bluetooth_service.dart';
+import 'settings_screen.dart';
 
 enum SortMode {
   numberThenColor, // Sort by number first, then by color
@@ -40,7 +41,15 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const CardGameScreen(),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: ThemeMode.system,
+      home: const BluetoothSetupScreen(),
     );
   }
 }
@@ -151,11 +160,6 @@ class _CardGameScreenState extends State<CardGameScreen> with TickerProviderStat
     
     // Zet wakelock aan om scherm wakker te houden tijdens het spelen
     WakelockPlus.enable();
-    
-    // Initialize players first, then show setup dialog
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showGameSetupDialog();
-    });
     
     // Initialize all animation controllers first
     _animationController = AnimationController(
@@ -586,6 +590,27 @@ class _CardGameScreenState extends State<CardGameScreen> with TickerProviderStat
         backgroundColor: const Color(0xFF0A4025),
         elevation: 0,
         actions: [
+          // Connected clients indicator (only show when hosting)
+          if (_bluetoothService.isHost && _bluetoothService.connectedClients.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.people, color: Colors.white, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${_bluetoothService.connectedClients.length}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
           IconButton(
             onPressed: () {
               Navigator.push(
@@ -596,7 +621,19 @@ class _CardGameScreenState extends State<CardGameScreen> with TickerProviderStat
               );
             },
             icon: const Icon(Icons.bluetooth, color: Colors.white),
-            tooltip: 'Bluetooth Multiplayer',
+            tooltip: '',
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingsScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.settings, color: Colors.white),
+            tooltip: 'Settings',
           ),
           IconButton(
             onPressed: () {
@@ -649,21 +686,24 @@ class _CardGameScreenState extends State<CardGameScreen> with TickerProviderStat
                     bottomRight: Radius.circular(20),
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: players.asMap().entries.map((entry) {
-                    int index = entry.key;
-                    Player player = entry.value;
-                    bool isCurrentPlayer = index == currentPlayerIndex;
-                    
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isCurrentPlayer ? Colors.orange : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isCurrentPlayer ? Colors.orange : Colors.white24,
-                          width: 2,
+                child: Column(
+                  children: [
+                    // Current players row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: players.asMap().entries.map((entry) {
+                        int index = entry.key;
+                        Player player = entry.value;
+                        bool isCurrentPlayer = index == currentPlayerIndex;
+                        
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isCurrentPlayer ? Colors.orange : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isCurrentPlayer ? Colors.orange : Colors.white24,
+                              width: 2,
                         ),
                       ),
                       child: Column(
@@ -688,7 +728,60 @@ class _CardGameScreenState extends State<CardGameScreen> with TickerProviderStat
                     );
                   }).toList(),
                 ),
-              ),
+                
+                // Connected clients list (only show when hosting and has clients)
+                if (_bluetoothService.isHost && _bluetoothService.connectedClients.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green, width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.wifi, color: Colors.green, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Connected Clients (${_bluetoothService.connectedClients.length})',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 8,
+                          children: _bluetoothService.connectedClients.map((client) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                client['name'] ?? 'Unknown',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
           
           // Center pile area
           Expanded(

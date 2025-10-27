@@ -4,13 +4,52 @@ import 'debug_service.dart';
 class BluetoothPeripheralChannel {
   static const MethodChannel _channel = MethodChannel('bluecard.ble.peripheral');
   
+  // Callback functions
+  static Function(String, String)? onClientConnected;
+  static Function(String, String)? onClientDisconnected;
+  static Function(String, String)? onDataReceived;
+  
+  static void _setupMethodCallHandler() {
+    _channel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'onClientConnected':
+          final String name = call.arguments['name'];
+          final String address = call.arguments['address'];
+          onClientConnected?.call(name, address);
+          break;
+        case 'onClientDisconnected':
+          final String name = call.arguments['name'];
+          final String address = call.arguments['address'];
+          onClientDisconnected?.call(name, address);
+          break;
+        case 'onDataReceived':
+          final String address = call.arguments['address'];
+          final String data = call.arguments['data'];
+          onDataReceived?.call(address, data);
+          break;
+      }
+    });
+  }
+
+  /// Check if BLE peripheral is supported
+  static Future<bool> isPeripheralSupported() async {
+    _setupMethodCallHandler(); // Ensure handler is set up
+    try {
+      final bool result = await _channel.invokeMethod('isPeripheralSupported');
+      return result;
+    } catch (e) {
+      DebugService().log('❌ Error checking peripheral support: $e');
+      return false;
+    }
+  }
+  
   /// Start BLE advertising with game service
   static Future<bool> startAdvertising({
     required String serviceUuid,
     required String deviceName,
   }) async {
     try {
-      DebugService().log('📱 Calling native startAdvertising...');
+      DebugService().log('� Calling native startAdvertising...');
       
       final result = await _channel.invokeMethod('startAdvertising', {
         'serviceUuid': serviceUuid,
@@ -42,17 +81,6 @@ class BluetoothPeripheralChannel {
       return false;
     } catch (e) {
       DebugService().log('❌ Channel error: $e');
-      return false;
-    }
-  }
-  
-  /// Check if BLE peripheral is supported
-  static Future<bool> isPeripheralSupported() async {
-    try {
-      final result = await _channel.invokeMethod('isPeripheralSupported');
-      return result == true;
-    } catch (e) {
-      DebugService().log('❌ Error checking peripheral support: $e');
       return false;
     }
   }
@@ -89,6 +117,17 @@ class BluetoothPeripheralChannel {
     } catch (e) {
       DebugService().log('❌ Error sending data: $e');
       return false;
+    }
+  }
+  
+  /// Get list of connected clients
+  static Future<List<Map<String, String>>> getConnectedClients() async {
+    try {
+      final result = await _channel.invokeMethod('getConnectedClients');
+      return List<Map<String, String>>.from(result.map((item) => Map<String, String>.from(item)));
+    } catch (e) {
+      DebugService().log('❌ Error getting connected clients: $e');
+      return [];
     }
   }
 }
