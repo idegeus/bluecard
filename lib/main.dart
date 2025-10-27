@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:logger/logger.dart';
 import 'bluetooth_setup_screen.dart';
 import 'bluetooth_service.dart';
 import 'settings_screen.dart';
+import 'debug_service.dart';
 
 enum SortMode {
   numberThenColor, // Sort by number first, then by color
@@ -24,6 +26,12 @@ class Player {
 }
 
 void main() {
+  // Initialize debug service with nice logging
+  DebugService().initialize(
+    enableColors: true,
+    logLevel: Level.debug,
+  );
+  
   runApp(const MyApp());
 }
 

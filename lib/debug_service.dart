@@ -1,331 +1,66 @@
-import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 
 class DebugService {
   static final DebugService _instance = DebugService._internal();
   factory DebugService() => _instance;
   DebugService._internal();
 
-  final ValueNotifier<List<String>> _messages = ValueNotifier<List<String>>([]);
-  ValueNotifier<List<String>> get messages => _messages;
+  late final Logger _logger;
 
+  void initialize({bool enableColors = true, Level logLevel = Level.debug}) {
+    _logger = Logger(
+      printer: PrettyPrinter(
+        methodCount: 2,
+        errorMethodCount: 8,
+        lineLength: 120,
+        colors: enableColors,
+        printEmojis: true,
+        dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
+      ),
+      level: logLevel,
+    );
+  }
+
+  // Legacy method for backward compatibility
   void log(String message) {
-    print(message); // Keep console logging too
-    _messages.value = [..._messages.value, message];
-    
-    // Keep only last 10 messages
-    if (_messages.value.length > 10) {
-      _messages.value = _messages.value.sublist(_messages.value.length - 10);
-    }
+    debug(message);
   }
 
-  void clear() {
-    _messages.value = [];
-  }
-}
-
-class DebugOverlay extends StatefulWidget {
-  final Widget child;
-
-  const DebugOverlay({super.key, required this.child});
-
-  @override
-  State<DebugOverlay> createState() => _DebugOverlayState();
-}
-
-class _DebugOverlayState extends State<DebugOverlay> {
-  bool _isMinimized = true;
-  double _dragX = 20;
-  double _dragY = 100;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        widget.child,
-        Positioned(
-          left: _dragX,
-          top: _dragY,
-          child: ValueListenableBuilder<List<String>>(
-            valueListenable: DebugService().messages,
-            builder: (context, messages, _) {
-              if (messages.isEmpty) return const SizedBox.shrink();
-              
-              return GestureDetector(
-                onPanUpdate: (details) {
-                  setState(() {
-                    _dragX += details.delta.dx;
-                    _dragY += details.delta.dy;
-                    
-                    // Keep within screen bounds
-                    _dragX = _dragX.clamp(0, MediaQuery.of(context).size.width - 200);
-                    _dragY = _dragY.clamp(0, MediaQuery.of(context).size.height - 100);
-                  });
-                },
-                child: Container(
-                  width: _isMinimized ? 80 : 300,
-                  constraints: BoxConstraints(
-                    maxHeight: _isMinimized ? 40 : 300,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.withOpacity(0.3), width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(2, 2),
-                      ),
-                    ],
-                  ),
-                  child: _isMinimized ? _buildMinimized() : _buildExpanded(messages),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
+  // Debug level - detailed information for debugging
+  void debug(String message, [dynamic error, StackTrace? stackTrace]) {
+    _logger.d(message, error: error, stackTrace: stackTrace);
   }
 
-  Widget _buildMinimized() {
-    return GestureDetector(
-      onTap: () => setState(() => _isMinimized = false),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 6),
-            const Text(
-              'Debug',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.expand_more,
-              color: Colors.white,
-              size: 16,
-            ),
-          ],
-        ),
-      ),
-    );
+  // Info level - general information
+  void info(String message, [dynamic error, StackTrace? stackTrace]) {
+    _logger.i(message, error: error, stackTrace: stackTrace);
   }
 
-  Widget _buildExpanded(List<String> messages) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.2),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(12),
-              topRight: Radius.circular(12),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '🔍 Debug Console',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    onTap: () => DebugService().clear(),
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      child: const Icon(
-                        Icons.clear_all,
-                        color: Colors.white70,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  GestureDetector(
-                    onTap: () => setState(() => _isMinimized = true),
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      child: const Icon(
-                        Icons.minimize,
-                        color: Colors.white70,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        // Messages
-        Flexible(
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: messages.map((message) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 1),
-                  child: Text(
-                    message,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontFamily: 'monospace',
-                      height: 1.2,
-                    ),
-                  ),
-                )).toList(),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+  // Warning level - potentially harmful situations
+  void warning(String message, [dynamic error, StackTrace? stackTrace]) {
+    _logger.w(message, error: error, stackTrace: stackTrace);
   }
-}
 
-class DebugWindow extends StatelessWidget {
-  const DebugWindow({super.key});
+  // Error level - error events that might still allow the app to continue
+  void error(String message, [dynamic error, StackTrace? stackTrace]) {
+    _logger.e(message, error: error, stackTrace: stackTrace);
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '🔍 Debug Console',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => DebugService().clear(),
-                      icon: const Icon(Icons.clear_all),
-                      tooltip: 'Clear logs',
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Close',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const Divider(),
-            
-            // Messages
-            Expanded(
-              child: ValueListenableBuilder<List<String>>(
-                valueListenable: DebugService().messages,
-                builder: (context, messages, _) {
-                  if (messages.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No debug messages yet...\nTry using the Bluetooth features!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 16,
-                        ),
-                      ),
-                    );
-                  }
-                  
-                  return Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: messages.map((message) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: SelectableText(
-                            message,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontFamily: 'monospace',
-                              height: 1.3,
-                            ),
-                          ),
-                        )).toList(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Footer with info
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline, size: 16, color: Colors.blue),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Real-time debug information from Bluetooth operations',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  // Fatal level - very severe error events that will presumably lead the app to abort
+  void fatal(String message, [dynamic error, StackTrace? stackTrace]) {
+    _logger.f(message, error: error, stackTrace: stackTrace);
+  }
+
+  // Bluetooth specific logging methods
+  void bluetoothDebug(String message, [dynamic error, StackTrace? stackTrace]) {
+    debug('[BLUETOOTH] $message', error, stackTrace);
+  }
+
+  void bluetoothError(String message, [dynamic error, StackTrace? stackTrace]) {
+    error('[BLUETOOTH] $message', error, stackTrace);
+  }
+
+  void bluetoothInfo(String message, [dynamic error, StackTrace? stackTrace]) {
+    info('[BLUETOOTH] $message', error, stackTrace);
   }
 }

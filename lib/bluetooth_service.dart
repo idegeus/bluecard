@@ -93,13 +93,13 @@ class BluetoothGameService extends ChangeNotifier {
       final messageJson = json.decode(data);
       final message = GameMessage.fromJson(messageJson);
       
-      DebugService().log('📨 Parsed message from $address: ${message.type} - ${message.data}');
+      DebugService().bluetoothDebug('📨 Parsed message from $address: ${message.type} - ${message.data}');
       
       // Handle ping messages specially
       if (message.type == GameMessageType.ping) {
         final timestamp = DateTime.now();
         final timestampString = timestamp.toIso8601String();
-        DebugService().log('🏓 PING received from ${message.playerId} at $timestampString');
+        DebugService().bluetoothDebug('🏓 PING received from ${message.playerId} at $timestampString');
         
         // Store ping in history for UI display
         _pingHistory.add({
@@ -122,7 +122,7 @@ class BluetoothGameService extends ChangeNotifier {
       // Notify listeners about the received message
       onMessageReceived?.call(message);
     } catch (e) {
-      DebugService().log('❌ Error parsing received message: $e');
+      DebugService().bluetoothError('❌ Error parsing received message: $e');
     }
   }
   
@@ -169,7 +169,7 @@ class BluetoothGameService extends ChangeNotifier {
   static const int _maxReconnectionAttempts = 3;
 
   Future<void> _handleConnectionLost() async {
-    DebugService().log('💥 Handling connection loss...');
+    DebugService().bluetoothInfo('💥 Handling connection loss...');
     
     try {
       // Stop all timers
@@ -208,14 +208,14 @@ class BluetoothGameService extends ChangeNotifier {
           _attemptReconnection(lastDevice);
         });
       } else if (_reconnectionAttempts >= _maxReconnectionAttempts) {
-        DebugService().log('❌ Max reconnection attempts reached, giving up');
+        DebugService().bluetoothError('❌ Max reconnection attempts reached, giving up');
         _reconnectionAttempts = 0;
       }
       
       DebugService().log('🔌 Connection loss handled successfully');
       
     } catch (e) {
-      DebugService().log('❌ Error during connection loss handling: $e');
+      DebugService().bluetoothError('❌ Error during connection loss handling: $e');
       // Force cleanup
       _connectedDevice = null;
       _gameCharacteristic = null;
@@ -238,10 +238,10 @@ class BluetoothGameService extends ChangeNotifier {
       
       // Try to connect
       await connectToHost(device);
-      DebugService().log('✅ Automatic reconnection successful!');
+      DebugService().bluetoothInfo('✅ Automatic reconnection successful!');
       
     } catch (e) {
-      DebugService().log('❌ Automatic reconnection failed: $e');
+      DebugService().bluetoothError('❌ Automatic reconnection failed: $e');
       // Could implement retry logic here with exponential backoff
     }
   }
