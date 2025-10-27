@@ -26,56 +26,37 @@ class BluetoothHost {
   BluetoothHost() {
     // Setup method call handler voor callbacks van native code
     _channel.setMethodCallHandler(_handleNativeCallback);
-    _messageController.add('🔧 BluetoothHost initialized, callback handler registered');
   }
   
   /// Handle callbacks van de native GATT server
   Future<dynamic> _handleNativeCallback(MethodCall call) async {
-    print('🔔 [BluetoothHost] Native callback received: ${call.method}');
-    print('🔔 [BluetoothHost] Arguments: ${call.arguments}');
-    _messageController.add('📞 Native callback received: ${call.method}');
-    
     switch (call.method) {
       case 'onClientConnected':
         final String name = call.arguments['name'] ?? 'Unknown';
         final String address = call.arguments['address'] ?? '';
-        print('🔔 [BluetoothHost] Processing onClientConnected: $name ($address)');
-        _messageController.add('🔔 Processing onClientConnected: $name ($address)');
         _onClientConnected(name, address);
         break;
         
       case 'onClientDisconnected':
         final String name = call.arguments['name'] ?? 'Unknown';
         final String address = call.arguments['address'] ?? '';
-        print('🔔 [BluetoothHost] Processing onClientDisconnected: $name ($address)');
-        _messageController.add('🔔 Processing onClientDisconnected: $name ($address)');
         _onClientDisconnected(name, address);
         break;
         
       case 'onDataReceived':
         final String address = call.arguments['address'] ?? '';
         final Uint8List data = call.arguments['data'];
-        print('🔔 [BluetoothHost] Processing onDataReceived from: $address (${data.length} bytes)');
-        _messageController.add('🔔 Processing onDataReceived from: $address');
         _onDataReceived(address, data);
         break;
-        
-      default:
-        print('⚠️ [BluetoothHost] Unknown callback method: ${call.method}');
-        _messageController.add('⚠️ Unknown callback method: ${call.method}');
     }
   }
   
   /// Client verbonden callback
   void _onClientConnected(String name, String address) {
-    print('✅ [BluetoothHost] _onClientConnected called: $name ($address)');
     _connectedClients.add({'name': name, 'address': address});
-    print('✅ [BluetoothHost] Client added, total: ${_connectedClients.length}');
     _clientCountController.add(_connectedClients.length);
-    print('✅ [BluetoothHost] Count stream updated');
     _messageController.add('📱 Client verbonden: $name ($address)');
     _messageController.add('👥 Totaal clients: ${_connectedClients.length}');
-    print('✅ [BluetoothHost] Messages added to stream');
   }
   
   /// Client verbroken callback
@@ -170,25 +151,6 @@ class BluetoothHost {
     } catch (e) {
       _messageController.add('❌ Fout bij verzenden notificatie: $e');
       rethrow;
-    }
-  }
-  
-  /// Test method om callbacks te checken
-  Future<void> testNativeCallback() async {
-    try {
-      _messageController.add('🧪 Testing native callback...');
-      
-      // Vraag aantal clients op
-      final int count = await _channel.invokeMethod('getConnectedClients');
-      _messageController.add('📊 Native reports $count connected clients');
-      
-      // Update de UI
-      if (count != _connectedClients.length) {
-        _messageController.add('⚠️ Mismatch! Flutter has ${_connectedClients.length}, native has $count');
-      }
-      
-    } catch (e) {
-      _messageController.add('❌ Test failed: $e');
     }
   }
   

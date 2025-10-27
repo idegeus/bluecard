@@ -27,7 +27,6 @@ class _HostScreenState extends State<HostScreen> {
   void _setupListeners() {
     // Luister naar Bluetooth berichten
     _bluetoothHost.messageStream.listen((message) {
-      print('📬 [HostScreen] Received message: $message');
       setState(() {
         _messages.insert(0, message);
         if (_messages.length > 50) {
@@ -38,7 +37,6 @@ class _HostScreenState extends State<HostScreen> {
     
     // Luister naar client count updates
     _bluetoothHost.clientCountStream.listen((count) {
-      print('📊 [HostScreen] Client count update: $count');
       setState(() {
         _clientCount = count;
       });
@@ -84,10 +82,6 @@ class _HostScreenState extends State<HostScreen> {
     await _bluetoothHost.sendNotificationToClients(
       '🧪 Test melding van host! Tijd: ${DateTime.now().toString().substring(11, 19)}'
     );
-  }
-  
-  Future<void> _testCallback() async {
-    await _bluetoothHost.testNativeCallback();
   }
   
   void _showError(String message) {
@@ -204,18 +198,6 @@ class _HostScreenState extends State<HostScreen> {
                           label: Text('Test Melding'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _testCallback,
-                          icon: Icon(Icons.bug_report),
-                          label: Text('Debug'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
                             padding: EdgeInsets.symmetric(vertical: 16),
                           ),
                         ),
