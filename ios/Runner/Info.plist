@@ -51,11 +51,14 @@
 	<string>This app uses Bluetooth to host and join multiplayer card games</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app uses Bluetooth to advertise as a game host for other players to connect</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access for Bluetooth scanning</string>
 	
 	<!-- Required background modes for BLE peripheral -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-peripheral</string>
+		<string>bluetooth-central</string>
 	</array>
 </dict>
 </plist>
