@@ -14,7 +14,7 @@ class MessageLog extends StatefulWidget {
 }
 
 class _MessageLogState extends State<MessageLog> {
-  bool _isExpanded = true;
+  bool _isExpanded = false; // Start collapsed
   
   @override
   Widget build(BuildContext context) {

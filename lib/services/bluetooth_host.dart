@@ -290,8 +290,8 @@ class BluetoothHost {
     // Stop de server
     await stopServer();
     
-    // Dispose de streams
-    dispose();
+    // NIET dispose() aanroepen - streams blijven beschikbaar voor logging
+    // dispose() wordt aangeroepen door de app wanneer deze echt afsluit
     
     _log('✅ Game afgesloten');
   }

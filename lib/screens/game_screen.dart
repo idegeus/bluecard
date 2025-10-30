@@ -67,7 +67,7 @@ class _GameScreenState extends State<GameScreen> {
               
               // Disconnect en ga naar home
               await widget.bluetoothClient?.disconnect();
-              widget.bluetoothClient?.dispose();
+              // NIET dispose() aanroepen - streams blijven beschikbaar
               
               if (mounted) {
                 Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
