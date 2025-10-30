@@ -3,7 +3,7 @@ import '../services/bluetooth_client.dart';
 import '../models/game_message.dart';
 import '../widgets/player_list.dart';
 import '../widgets/message_log.dart';
-import 'client_game_screen.dart';
+import 'game_screen.dart';
 
 class ClientScreen extends StatefulWidget {
   const ClientScreen({Key? key}) : super(key: key);
@@ -73,12 +73,13 @@ class _ClientScreenState extends State<ClientScreen> {
       
       switch (gameMessage.type) {
         case GameMessageType.startGame:
-          // Navigeer naar game screen
-          Navigator.push(
+          // Navigeer naar gedeelde game screen
+          Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => ClientGameScreen(
+              builder: (context) => GameScreen(
                 bluetoothClient: _bluetoothClient,
+                isHost: false,
               ),
             ),
           );
@@ -192,7 +193,9 @@ class _ClientScreenState extends State<ClientScreen> {
   
   @override
   void dispose() {
-    _bluetoothClient.dispose();
+    // NIET de service disposen - deze moet actief blijven voor andere schermen
+    // De service wordt alleen gedisposed bij quitGame()
+    // _bluetoothClient.dispose();
     super.dispose();
   }
   

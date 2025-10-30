@@ -4,6 +4,7 @@ import '../services/game_service.dart';
 import '../models/game_message.dart';
 import '../widgets/player_list.dart';
 import '../widgets/message_log.dart';
+import 'game_screen.dart';
 
 class HostScreen extends StatefulWidget {
   const HostScreen({Key? key}) : super(key: key);
@@ -60,9 +61,19 @@ class _HostScreenState extends State<HostScreen> {
     
     // Luister naar game messages voor navigatie
     _bluetoothHost.gameMessageStream.listen((gameMessage) {
-      if (gameMessage.type == GameMessageType.startGame) {
-        // Host blijft op deze screen, maar game is nu gestart
-        setState(() {});
+      print('🎮 HostScreen received gameMessage: ${gameMessage.type}');
+      if (gameMessage.type == GameMessageType.startGame && mounted) {
+        print('🎮 HostScreen navigating to GameScreen...');
+        // Navigeer naar gedeelde game screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => GameScreen(
+              bluetoothHost: _bluetoothHost,
+              isHost: true,
+            ),
+          ),
+        );
       }
     });
     
@@ -131,8 +142,10 @@ class _HostScreenState extends State<HostScreen> {
   
   @override
   void dispose() {
-    _bluetoothHost.dispose();
-    _gameService.dispose();
+    // NIET de services disposen - deze moeten actief blijven voor andere schermen
+    // De services worden alleen gedisposed bij quitGame()
+    // _bluetoothHost.dispose();
+    // _gameService.dispose();
     super.dispose();
   }
   

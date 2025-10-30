@@ -252,7 +252,9 @@ class BluetoothHost {
     await _sendGameMessage(startMessage);
     
     // Broadcast ook naar host zelf
+    print('🎮 Broadcasting startGame to host itself');
     _gameMessageController.add(startMessage);
+    print('🎮 startGame broadcasted');
   }
   
   /// Stuur een ping
@@ -267,6 +269,31 @@ class BluetoothHost {
     
     // Broadcast ook naar host zelf
     _broadcastGameMessage(pingMessage);
+  }
+  
+  /// Sluit game netjes af en stuur goodbye message
+  Future<void> quitGame() async {
+    _log('👋 Afsluiten van game...');
+    
+    // Stuur goodbye message naar alle clients
+    final goodbyeMessage = GameMessage(
+      type: GameMessageType.goodbye,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      playerId: _playerId,
+    );
+    
+    await _sendGameMessage(goodbyeMessage);
+    
+    // Wacht even zodat bericht verzonden kan worden
+    await Future.delayed(Duration(milliseconds: 500));
+    
+    // Stop de server
+    await stopServer();
+    
+    // Dispose de streams
+    dispose();
+    
+    _log('✅ Game afgesloten');
   }
   
   /// Stuur playerJoined message naar alle clients

@@ -108,6 +108,10 @@ class BluetoothClient {
                 _log('📋 Spelers: ${(playerIds as List).join(", ")}');
               }
               break;
+              
+            case GameMessageType.goodbye:
+              _log('👋 Host heeft game afgesloten');
+              break;
           }
           
           // Log content als het bestaat
@@ -327,6 +331,27 @@ class BluetoothClient {
       _log('❌ Fout bij stoppen service: $e');
       rethrow;
     }
+  }
+  
+  /// Sluit game netjes af en stuur goodbye message
+  Future<void> quitGame() async {
+    _log('👋 Afsluiten van game...');
+    
+    // Stuur goodbye message naar host
+    await sendMessage(
+      type: GameMessageType.goodbye,
+    );
+    
+    // Wacht even zodat bericht verzonden kan worden
+    await Future.delayed(Duration(milliseconds: 500));
+    
+    // Disconnect
+    await disconnect();
+    
+    // Dispose de streams
+    dispose();
+    
+    _log('✅ Game afgesloten');
   }
   
   void dispose() {

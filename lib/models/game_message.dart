@@ -5,6 +5,7 @@ enum GameMessageType {
   startGame,
   ping,
   playerJoined,
+  goodbye,
 }
 
 /// Game message voor communicatie tussen host en clients
