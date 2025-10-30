@@ -357,23 +357,58 @@ class BlueCardGattServer(private val context: Context) {
                 buffer.append(chunkString)
                 Log.d(TAG, "🔄 Buffer size for $deviceAddress: ${buffer.length} chars")
                 
-                // Check of we een compleet JSON object hebben
-                val bufferContent = buffer.toString()
-                if (bufferContent.trim().endsWith("}")) {
-                    Log.d(TAG, "✅ Complete message received from $deviceAddress: $bufferContent")
+                // Probeer JSON berichten te parsen en verwerken
+                var bufferContent = buffer.toString().trim()
+                
+                // Blijf JSON objecten verwerken zolang er complete objecten in de buffer zitten
+                while (bufferContent.isNotEmpty()) {
+                    // Zoek naar het eerste complete JSON object
+                    val firstBraceIndex = bufferContent.indexOf('{')
+                    if (firstBraceIndex == -1) {
+                        // Geen opening brace, clear buffer
+                        writeBuffers.remove(deviceAddress)
+                        break
+                    }
+                    
+                    // Tel braces om het einde van het JSON object te vinden
+                    var braceCount = 0
+                    var endIndex = -1
+                    
+                    for (i in firstBraceIndex until bufferContent.length) {
+                        when (bufferContent[i]) {
+                            '{' -> braceCount++
+                            '}' -> {
+                                braceCount--
+                                if (braceCount == 0) {
+                                    endIndex = i
+                                    break
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (endIndex == -1) {
+                        // Geen compleet JSON object gevonden, wacht op meer data
+                        Log.d(TAG, "⏳ Incomplete JSON from $deviceAddress, waiting for more chunks...")
+                        break
+                    }
+                    
+                    // Extract het complete JSON object
+                    val jsonMessage = bufferContent.substring(firstBraceIndex, endIndex + 1)
+                    Log.d(TAG, "✅ Complete message received from $deviceAddress: $jsonMessage")
                     
                     // Callback met complete data
                     if (onDataReceived != null) {
                         Log.d(TAG, "🔔 Calling onDataReceived callback")
-                        onDataReceived?.invoke(deviceAddress, bufferContent.trim().toByteArray())
+                        onDataReceived?.invoke(deviceAddress, jsonMessage.toByteArray())
                     } else {
                         Log.e(TAG, "❌ onDataReceived callback is NULL!")
                     }
                     
-                    // Clear buffer voor volgende bericht
-                    writeBuffers.remove(deviceAddress)
-                } else {
-                    Log.d(TAG, "⏳ Incomplete JSON from $deviceAddress, waiting for more chunks...")
+                    // Verwijder verwerkt bericht uit buffer
+                    bufferContent = bufferContent.substring(endIndex + 1).trim()
+                    buffer.clear()
+                    buffer.append(bufferContent)
                 }
             }
             

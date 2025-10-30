@@ -4,6 +4,7 @@ import 'dart:convert';
 enum GameMessageType {
   startGame,
   ping,
+  playerJoined,
 }
 
 /// Game message voor communicatie tussen host en clients

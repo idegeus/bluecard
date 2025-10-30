@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/bluetooth_client.dart';
 import '../models/game_message.dart';
+import '../widgets/player_list.dart';
 import 'client_game_screen.dart';
 
 class ClientScreen extends StatefulWidget {
@@ -17,6 +18,8 @@ class _ClientScreenState extends State<ClientScreen> {
   bool _isConnected = false;
   bool _isSearching = false;
   String? _hostName;
+  int _playerCount = 0;
+  List<String> _playerIds = [];
   
   @override
   void initState() {
@@ -64,16 +67,33 @@ class _ClientScreenState extends State<ClientScreen> {
     
     // Luister naar game messages voor auto-navigatie
     _bluetoothClient.gameMessageStream.listen((gameMessage) {
-      if (gameMessage.type == GameMessageType.startGame && mounted) {
-        // Navigeer naar game screen
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ClientGameScreen(
-              bluetoothClient: _bluetoothClient,
+      if (!mounted) return;
+      
+      switch (gameMessage.type) {
+        case GameMessageType.startGame:
+          // Navigeer naar game screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ClientGameScreen(
+                bluetoothClient: _bluetoothClient,
+              ),
             ),
-          ),
-        );
+          );
+          break;
+          
+        case GameMessageType.playerJoined:
+          // Update player lijst
+          if (gameMessage.content != null) {
+            setState(() {
+              _playerCount = gameMessage.content!['playerCount'] ?? 0;
+              _playerIds = List<String>.from(gameMessage.content!['playerIds'] ?? []);
+            });
+          }
+          break;
+          
+        default:
+          break;
       }
     });
   }
@@ -289,6 +309,15 @@ class _ClientScreenState extends State<ClientScreen> {
               ],
             ),
           ),
+          
+          // Spelers lijst (alleen tonen als verbonden en er spelers zijn)
+          if (_isConnected && _playerIds.isNotEmpty) ...[
+            PlayerList(
+              playerCount: _playerCount,
+              playerIds: _playerIds,
+            ),
+            SizedBox(height: 16),
+          ],
           
           // Berichten log
           Padding(

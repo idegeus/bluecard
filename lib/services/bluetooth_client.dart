@@ -99,6 +99,15 @@ class BluetoothClient {
             case GameMessageType.startGame:
               _log('🎮 Game gestart door host!');
               break;
+              
+            case GameMessageType.playerJoined:
+              if (gameMessage.content != null) {
+                final playerCount = gameMessage.content!['playerCount'];
+                final playerIds = gameMessage.content!['playerIds'];
+                _log('👥 Speler toegevoegd! Totaal: $playerCount spelers');
+                _log('📋 Spelers: ${(playerIds as List).join(", ")}');
+              }
+              break;
           }
           
           // Log content als het bestaat

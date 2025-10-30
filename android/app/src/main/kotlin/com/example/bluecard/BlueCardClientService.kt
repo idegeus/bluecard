@@ -326,21 +326,55 @@ class BlueCardClientService : Service() {
                 dataBuffer.append(chunk)
                 Log.d(TAG, "🔄 Buffer size: ${dataBuffer.length} chars")
                 
-                // Check of we een compleet JSON object hebben (eenvoudige check: eindigt op })
-                val bufferContent = dataBuffer.toString()
-                if (bufferContent.trim().endsWith("}")) {
-                    Log.d(TAG, "✅ Complete message received: $bufferContent")
+                // Probeer JSON berichten te parsen en verwerken
+                var bufferContent = dataBuffer.toString().trim()
+                
+                // Blijf JSON objecten verwerken zolang er complete objecten in de buffer zitten
+                while (bufferContent.isNotEmpty()) {
+                    // Zoek naar het eerste complete JSON object
+                    val firstBraceIndex = bufferContent.indexOf('{')
+                    if (firstBraceIndex == -1) {
+                        // Geen opening brace, clear buffer
+                        dataBuffer.clear()
+                        break
+                    }
                     
-                    // Parse als JSON game message
-                    val message = bufferContent.trim()
-                    onDataReceived?.invoke(message.toByteArray())
-                    onGameMessage?.invoke(message)
+                    // Tel braces om het einde van het JSON object te vinden
+                    var braceCount = 0
+                    var endIndex = -1
                     
-                    // Clear buffer voor volgende bericht
-                    dataBuffer.clear()
+                    for (i in firstBraceIndex until bufferContent.length) {
+                        when (bufferContent[i]) {
+                            '{' -> braceCount++
+                            '}' -> {
+                                braceCount--
+                                if (braceCount == 0) {
+                                    endIndex = i
+                                    break
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (endIndex == -1) {
+                        // Geen compleet JSON object gevonden, wacht op meer data
+                        Log.d(TAG, "⏳ Incomplete JSON, waiting for more chunks...")
+                        break
+                    }
+                    
+                    // Extract het complete JSON object
+                    val jsonMessage = bufferContent.substring(firstBraceIndex, endIndex + 1)
+                    Log.d(TAG, "✅ Complete message received: $jsonMessage")
+                    
+                    // Verwerk het bericht
+                    onDataReceived?.invoke(jsonMessage.toByteArray())
+                    onGameMessage?.invoke(jsonMessage)
                     updateNotification("Synced with $hostDeviceName")
-                } else {
-                    Log.d(TAG, "⏳ Incomplete JSON, waiting for more chunks...")
+                    
+                    // Verwijder verwerkt bericht uit buffer
+                    bufferContent = bufferContent.substring(endIndex + 1).trim()
+                    dataBuffer.clear()
+                    dataBuffer.append(bufferContent)
                 }
             }
         }

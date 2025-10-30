@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/bluetooth_host.dart';
 import '../services/game_service.dart';
 import '../models/game_message.dart';
+import '../widgets/player_list.dart';
 
 class HostScreen extends StatefulWidget {
   const HostScreen({Key? key}) : super(key: key);
@@ -17,6 +18,7 @@ class _HostScreenState extends State<HostScreen> {
   final List<String> _messages = [];
   bool _isServerStarted = false;
   int _clientCount = 0;
+  List<String> _playerIds = ['host']; // Altijd host + clients
   
   @override
   void initState() {
@@ -45,6 +47,13 @@ class _HostScreenState extends State<HostScreen> {
     _bluetoothHost.clientCountStream.listen((count) {
       setState(() {
         _clientCount = count;
+      });
+    });
+    
+    // Luister naar player IDs updates
+    _bluetoothHost.playerIdsStream.listen((playerIds) {
+      setState(() {
+        _playerIds = playerIds;
       });
     });
     
@@ -256,6 +265,15 @@ class _HostScreenState extends State<HostScreen> {
               ],
             ),
           ),
+          
+          // Spelers lijst
+          if (_playerIds.isNotEmpty) ...[
+            PlayerList(
+              playerCount: _bluetoothHost.totalPlayerCount,
+              playerIds: _playerIds,
+            ),
+            SizedBox(height: 16),
+          ],
           
           // Berichten log
           Padding(

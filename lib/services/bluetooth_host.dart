@@ -16,6 +16,7 @@ class BluetoothHost {
   final StreamController<int> _clientCountController = StreamController.broadcast();
   final StreamController<GameMessage> _gameMessageController = StreamController.broadcast();
   final StreamController<DateTime> _lastSyncController = StreamController.broadcast();
+  final StreamController<List<String>> _playerIdsController = StreamController.broadcast();
   
   bool _isAdvertising = false;
   bool _gameStarted = false;
@@ -28,8 +29,16 @@ class BluetoothHost {
   Stream<int> get clientCountStream => _clientCountController.stream;
   Stream<GameMessage> get gameMessageStream => _gameMessageController.stream;
   Stream<DateTime> get lastSyncStream => _lastSyncController.stream;
+  Stream<List<String>> get playerIdsStream => _playerIdsController.stream;
   int get connectedClientCount => _connectedClients.length;
   int get totalPlayerCount => _connectedClients.length + 1; // +1 voor host
+  List<String> get playerIds {
+    final ids = ['host'];
+    for (var client in _connectedClients) {
+      ids.add(client['playerId'] ?? 'unknown');
+    }
+    return ids;
+  }
   bool get isAdvertising => _isAdvertising;
   bool get gameStarted => _gameStarted;
   String? get hostName => _currentHostName;
@@ -77,16 +86,31 @@ class BluetoothHost {
       return;
     }
     
-    _connectedClients.add({'name': name, 'address': address});
+    // Genereer player ID voor nieuwe client (gebaseerd op aantal spelers)
+    final playerId = 'player${_connectedClients.length + 1}';
+    
+    _connectedClients.add({
+      'name': name,
+      'address': address,
+      'playerId': playerId,
+    });
     _clientCountController.add(_connectedClients.length);
-    _log('📱 Client verbonden: $name ($address)');
+    _playerIdsController.add(playerIds); // Broadcast nieuwe player lijst
+    _log('📱 Client verbonden: $name ($playerId)');
     _log('👥 Totaal clients: ${_connectedClients.length}');
+    
+    // Kleine delay om te zorgen dat client notifications goed ingesteld zijn
+    Future.delayed(Duration(milliseconds: 500), () {
+      // Stuur playerJoined message naar alle clients
+      _sendPlayerJoinedMessage();
+    });
   }
   
   /// Client verbroken callback
   void _onClientDisconnected(String name, String address) {
     _connectedClients.removeWhere((client) => client['address'] == address);
     _clientCountController.add(_connectedClients.length);
+    _playerIdsController.add(playerIds); // Broadcast nieuwe player lijst
     _log('📴 Client verbroken: $name ($address)');
     _log('👥 Totaal clients: ${_connectedClients.length}');
   }
@@ -244,6 +268,28 @@ class BluetoothHost {
     _broadcastGameMessage(pingMessage);
   }
   
+  /// Stuur playerJoined message naar alle clients
+  Future<void> _sendPlayerJoinedMessage() async {
+    // Verzamel alle player IDs (host + alle clients)
+    final List<String> playerIds = ['host'];
+    for (var client in _connectedClients) {
+      playerIds.add(client['playerId'] ?? 'unknown');
+    }
+    
+    final playerJoinedMessage = GameMessage(
+      type: GameMessageType.playerJoined,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      playerId: _playerId,
+      content: {
+        'playerCount': _connectedClients.length + 1, // +1 voor host
+        'playerIds': playerIds,
+      },
+    );
+    
+    await _sendGameMessage(playerJoinedMessage);
+    _log('📢 PlayerJoined message verzonden: ${playerIds.length} spelers');
+  }
+  
   /// Start automatische ping timer (elke 10 seconden)
   void _startPingTimer() {
     _stopPingTimer(); // Stop oude timer indien actief
@@ -310,5 +356,6 @@ class BluetoothHost {
     _clientCountController.close();
     _gameMessageController.close();
     _lastSyncController.close();
+    _playerIdsController.close();
   }
 }
