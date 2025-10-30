@@ -1,9 +1,11 @@
 package com.example.bluecard
 
 import android.Manifest
+import android.content.*
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.core.app.ActivityCompat
@@ -13,12 +15,19 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "bluecard.gatt.server"
-    private var gattServer: BlueCardGattServer? = null
+    private val HOST_CHANNEL = "bluecard.host.service"
+    private val CLIENT_CHANNEL = "bluecard.client.service"
+    
     private val PERMISSION_REQUEST_CODE = 1001
-    private var methodChannel: MethodChannel? = null
+    private var hostMethodChannel: MethodChannel? = null
+    private var clientMethodChannel: MethodChannel? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var callbacksSetup = false
+    
+    // Service bindings
+    private var hostService: BlueCardHostService? = null
+    private var clientService: BlueCardClientService? = null
+    private var isHostBound = false
+    private var isClientBound = false
     
     companion object {
         private const val TAG = "MainActivity"
@@ -27,34 +36,83 @@ class MainActivity: FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        setupHostChannel(flutterEngine)
+        setupClientChannel(flutterEngine)
+    }
+    
+    private fun setupHostChannel(flutterEngine: FlutterEngine) {
+        hostMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, HOST_CHANNEL)
         
-        methodChannel?.setMethodCallHandler { call, result ->
+        hostMethodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
-                "startServer" -> {
+                "startHostService" -> {
                     val deviceName = call.argument<String>("deviceName") ?: "BlueCard-Host"
                     
-                    // Check en vraag permissions
                     if (checkAndRequestPermissions()) {
-                        startGattServer(deviceName, result)
+                        startHostService(deviceName)
+                        result.success(true)
                     } else {
                         result.error("PERMISSION_DENIED", "Bluetooth permissions zijn vereist", null)
                     }
                 }
-                "stopServer" -> {
-                    stopGattServer(result)
+                "stopHostService" -> {
+                    stopHostService()
+                    result.success(true)
                 }
                 "sendData" -> {
                     val data = call.argument<ByteArray>("data")
                     if (data != null) {
-                        sendData(data, result)
+                        val success = hostService?.sendDataToClients(data) ?: false
+                        result.success(success)
                     } else {
                         result.error("INVALID_ARGUMENT", "Data is null", null)
                     }
                 }
+                "startGame" -> {
+                    hostService?.startGame()
+                    result.success(true)
+                }
                 "getConnectedClients" -> {
-                    val count = gattServer?.getConnectedClientCount() ?: 0
+                    val count = hostService?.getConnectedClientCount() ?: 0
                     result.success(count)
+                }
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+    }
+    
+    private fun setupClientChannel(flutterEngine: FlutterEngine) {
+        clientMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CLIENT_CHANNEL)
+        
+        clientMethodChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startClientService" -> {
+                    // Start service zonder device address - service zal zelf scannen
+                    if (checkAndRequestPermissions()) {
+                        startClientService()
+                        result.success(true)
+                    } else {
+                        result.error("PERMISSION_DENIED", "Bluetooth permissions required", null)
+                    }
+                }
+                "stopClientService" -> {
+                    stopClientService()
+                    result.success(true)
+                }
+                "sendDataToHost" -> {
+                    val data = call.argument<ByteArray>("data")
+                    if (data != null) {
+                        val success = clientService?.sendData(data) ?: false
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Data is null", null)
+                    }
+                }
+                "isConnected" -> {
+                    val connected = clientService?.isConnectedToHost() ?: false
+                    result.success(connected)
                 }
                 else -> {
                     result.notImplemented()
@@ -79,9 +137,16 @@ class MainActivity: FlutterActivity() {
             }
         }
         
-        // Location permission (vereist voor Bluetooth op alle Android versies)
+        // Location permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        
+        // Foreground service permission (Android 14+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE) != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE)
+            }
         }
         
         if (permissionsNeeded.isNotEmpty()) {
@@ -92,78 +157,165 @@ class MainActivity: FlutterActivity() {
         return true
     }
     
-    private fun startGattServer(deviceName: String, result: MethodChannel.Result) {
-        Log.d(TAG, "📱 startGattServer called with deviceName: $deviceName")
+    // Host Service Management
+    private fun startHostService(deviceName: String) {
+        Log.d(TAG, "🚀 Starting Host Service: $deviceName")
         
-        if (gattServer == null) {
-            Log.d(TAG, "Creating new BlueCardGattServer instance")
-            gattServer = BlueCardGattServer(this)
+        val intent = Intent(this, BlueCardHostService::class.java).apply {
+            action = BlueCardHostService.ACTION_START
+            putExtra(BlueCardHostService.EXTRA_DEVICE_NAME, deviceName)
         }
         
-        // BELANGRIJK: Setup callbacks VOOR het starten van de server
-        // Anders missen we early connection events
-        setupGattServerCallbacks()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
         
-        Log.d(TAG, "Starting GATT server...")
-        val success = gattServer?.startServer(deviceName) ?: false
-        Log.d(TAG, "GATT server start result: $success")
-        result.success(success)
+        // Bind to service
+        bindService(intent, hostServiceConnection, Context.BIND_AUTO_CREATE)
     }
     
-    private fun setupGattServerCallbacks() {
-        if (callbacksSetup) {
-            Log.d(TAG, "⚠️ Callbacks already setup, skipping")
-            return
+    private fun stopHostService() {
+        Log.d(TAG, "🛑 Stopping Host Service")
+        
+        if (isHostBound) {
+            unbindService(hostServiceConnection)
+            isHostBound = false
         }
         
-        Log.d(TAG, "Setting up GATT server callbacks")
-        
-        // Setup callbacks om client events naar Flutter te sturen
-        // BELANGRIJK: Post naar main thread omdat MethodChannel alleen op UI thread werkt
-        gattServer?.onClientConnected = { name, address ->
-            Log.d(TAG, "🔔 Callback: Client connected - $name ($address)")
-            mainHandler.post {
-                Log.d(TAG, "📤 Invoking Flutter method: onClientConnected")
-                methodChannel?.invokeMethod("onClientConnected", mapOf(
-                    "name" to name,
-                    "address" to address
-                ))
+        val intent = Intent(this, BlueCardHostService::class.java).apply {
+            action = BlueCardHostService.ACTION_STOP
+        }
+        startService(intent)
+        hostService = null
+    }
+    
+    private val hostServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            Log.d(TAG, "✅ Host Service connected")
+            val binder = service as BlueCardHostService.LocalBinder
+            hostService = binder.getService()
+            isHostBound = true
+            
+            // Setup callbacks
+            hostService?.onClientConnected = { deviceName, address ->
+                mainHandler.post {
+                    hostMethodChannel?.invokeMethod("onClientConnected", mapOf(
+                        "name" to deviceName,
+                        "address" to address
+                    ))
+                }
+            }
+            
+            hostService?.onClientDisconnected = { deviceName, address ->
+                mainHandler.post {
+                    hostMethodChannel?.invokeMethod("onClientDisconnected", mapOf(
+                        "name" to deviceName,
+                        "address" to address
+                    ))
+                }
+            }
+            
+            hostService?.onDataReceived = { address, data ->
+                mainHandler.post {
+                    hostMethodChannel?.invokeMethod("onDataReceived", mapOf(
+                        "address" to address,
+                        "data" to data
+                    ))
+                }
             }
         }
         
-        gattServer?.onClientDisconnected = { name, address ->
-            Log.d(TAG, "🔔 Callback: Client disconnected - $name ($address)")
-            mainHandler.post {
-                Log.d(TAG, "📤 Invoking Flutter method: onClientDisconnected")
-                methodChannel?.invokeMethod("onClientDisconnected", mapOf(
-                    "name" to name,
-                    "address" to address
-                ))
+        override fun onServiceDisconnected(name: ComponentName?) {
+            Log.d(TAG, "❌ Host Service disconnected")
+            hostService = null
+            isHostBound = false
+        }
+    }
+    
+    // Client Service Management
+    private fun startClientService() {
+        Log.d(TAG, "🚀 Starting Client Service (will scan for hosts)")
+        
+        val intent = Intent(this, BlueCardClientService::class.java).apply {
+            action = BlueCardClientService.ACTION_START
+            // Geen device address - service zal zelf scannen
+        }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        
+        // Bind to service
+        bindService(intent, clientServiceConnection, Context.BIND_AUTO_CREATE)
+    }
+    
+    private fun stopClientService() {
+        Log.d(TAG, "🛑 Stopping Client Service")
+        
+        if (isClientBound) {
+            unbindService(clientServiceConnection)
+            isClientBound = false
+        }
+        
+        val intent = Intent(this, BlueCardClientService::class.java).apply {
+            action = BlueCardClientService.ACTION_STOP
+        }
+        startService(intent)
+        clientService = null
+    }
+    
+    private val clientServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            Log.d(TAG, "✅ Client Service connected")
+            val binder = service as BlueCardClientService.LocalBinder
+            clientService = binder.getService()
+            isClientBound = true
+            
+            // Setup callbacks
+            clientService?.onConnectionStateChanged = { connected ->
+                mainHandler.post {
+                    clientMethodChannel?.invokeMethod("onConnectionStateChanged", mapOf(
+                        "connected" to connected
+                    ))
+                }
+            }
+            
+            clientService?.onDataReceived = { data ->
+                mainHandler.post {
+                    clientMethodChannel?.invokeMethod("onDataReceived", mapOf(
+                        "data" to data
+                    ))
+                }
+            }
+            
+            clientService?.onGameMessage = { message ->
+                mainHandler.post {
+                    clientMethodChannel?.invokeMethod("onGameMessage", mapOf(
+                        "message" to message
+                    ))
+                }
             }
         }
         
-        gattServer?.onDataReceived = { address, data ->
-            Log.d(TAG, "🔔 Callback: Data received from $address - ${data.size} bytes")
-            mainHandler.post {
-                Log.d(TAG, "📤 Invoking Flutter method: onDataReceived")
-                methodChannel?.invokeMethod("onDataReceived", mapOf(
-                    "address" to address,
-                    "data" to data
-                ))
-            }
+        override fun onServiceDisconnected(name: ComponentName?) {
+            Log.d(TAG, "❌ Client Service disconnected")
+            clientService = null
+            isClientBound = false
         }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
         
-        callbacksSetup = true
-        Log.d(TAG, "✅ GATT server callbacks configured")
-    }
-    
-    private fun stopGattServer(result: MethodChannel.Result) {
-        gattServer?.stopServer()
-        result.success(true)
-    }
-    
-    private fun sendData(data: ByteArray, result: MethodChannel.Result) {
-        val success = gattServer?.sendDataToClients(data) ?: false
-        result.success(success)
+        if (isHostBound) {
+            unbindService(hostServiceConnection)
+        }
+        if (isClientBound) {
+            unbindService(clientServiceConnection)
+        }
     }
 }

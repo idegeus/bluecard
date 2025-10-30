@@ -32,6 +32,12 @@ class BlueCardGattServer(private val context: Context) {
     private val connectedDevices = mutableSetOf<BluetoothDevice>()
     private var gameCharacteristic: BluetoothGattCharacteristic? = null
     
+    // MTU per device (standaard 23, na negotiation groter)
+    private val deviceMtuMap = mutableMapOf<String, Int>()
+    
+    // Data buffering voor multi-packet write requests (per device)
+    private val writeBuffers = mutableMapOf<String, StringBuilder>()
+    
     // Callbacks voor Flutter
     var onClientConnected: ((String, String) -> Unit)? = null
     var onClientDisconnected: ((String, String) -> Unit)? = null
@@ -195,7 +201,7 @@ class BlueCardGattServer(private val context: Context) {
     }
     
     /**
-     * Verstuur data naar alle verbonden clients
+     * Verstuur data naar alle verbonden clients (gebruikt MTU voor optimale packet size)
      */
     fun sendDataToClients(data: ByteArray): Boolean {
         if (connectedDevices.isEmpty()) {
@@ -203,22 +209,56 @@ class BlueCardGattServer(private val context: Context) {
             return false
         }
         
-        gameCharacteristic?.value = data
+        Log.d(TAG, "📦 Sending ${data.size} bytes to ${connectedDevices.size} client(s)")
         
         var successCount = 0
         connectedDevices.forEach { device ->
             try {
-                val success = androidGattServer?.notifyCharacteristicChanged(
-                    device,
-                    gameCharacteristic,
-                    false
-                )
-                if (success == true) {
-                    successCount++
-                    Log.d(TAG, "📤 Sent data to ${device.address}")
+                // Gebruik MTU van dit device (standaard 23, na negotiation groter)
+                val mtu = deviceMtuMap[device.address] ?: 23
+                val payloadSize = mtu - 3  // ATT overhead is 3 bytes
+                val totalChunks = (data.size + payloadSize - 1) / payloadSize
+                
+                Log.d(TAG, "� Device ${device.address} MTU=$mtu, payload=$payloadSize bytes, chunks=$totalChunks")
+                
+                var allChunksSent = true
+                
+                // Verstuur elke chunk
+                for (i in 0 until totalChunks) {
+                    val start = i * payloadSize
+                    val end = minOf(start + payloadSize, data.size)
+                    val chunk = data.copyOfRange(start, end)
+                    
+                    gameCharacteristic?.value = chunk
+                    
+                    val success = androidGattServer?.notifyCharacteristicChanged(
+                        device,
+                        gameCharacteristic,
+                        false
+                    )
+                    
+                    if (success == true) {
+                        Log.d(TAG, "📤 Chunk ${i + 1}/$totalChunks (${chunk.size} bytes) sent to ${device.address}")
+                        
+                        // Kleine delay alleen bij meerdere chunks
+                        if (totalChunks > 1 && i < totalChunks - 1) {
+                            Thread.sleep(5) // 5ms delay
+                        }
+                    } else {
+                        Log.e(TAG, "❌ Failed to send chunk ${i + 1} to ${device.address}")
+                        allChunksSent = false
+                        break
+                    }
                 }
+                
+                if (allChunksSent) {
+                    successCount++
+                }
+                
             } catch (e: SecurityException) {
                 Log.e(TAG, "❌ Permission denied sending to ${device.address}: ${e.message}")
+            } catch (e: InterruptedException) {
+                Log.e(TAG, "❌ Interrupted while sending chunks: ${e.message}")
             }
         }
         
@@ -253,6 +293,8 @@ class BlueCardGattServer(private val context: Context) {
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     connectedDevices.remove(device)
+                    writeBuffers.remove(device.address) // Clear buffer bij disconnect
+                    deviceMtuMap.remove(device.address) // Clear MTU bij disconnect
                     Log.d(TAG, "❌ Client disconnected: ${device.name} (${device.address})")
                     Log.d(TAG, "📊 Total clients: ${connectedDevices.size}")
                     onClientDisconnected?.invoke(device.name ?: "Unknown", device.address)
@@ -300,17 +342,38 @@ class BlueCardGattServer(private val context: Context) {
             value: ByteArray?
         ) {
             super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value)
-            Log.d(TAG, "✍️ Write request from ${device?.address} for characteristic ${characteristic?.uuid}")
             
-            value?.let {
-                Log.d(TAG, "📨 Received ${it.size} bytes from ${device?.address}")
+            val deviceAddress = device?.address ?: "unknown"
+            Log.d(TAG, "✍️ Write request from $deviceAddress for characteristic ${characteristic?.uuid}")
+            
+            value?.let { chunk ->
+                Log.d(TAG, "📨 Received chunk: ${chunk.size} bytes from $deviceAddress")
                 
-                // Check of callback is gezet
-                if (onDataReceived != null) {
-                    Log.d(TAG, "🔔 Calling onDataReceived callback")
-                    onDataReceived?.invoke(device?.address ?: "unknown", it)
+                // Get of maak buffer voor dit device
+                val buffer = writeBuffers.getOrPut(deviceAddress) { StringBuilder() }
+                
+                // Voeg chunk toe aan buffer
+                val chunkString = String(chunk)
+                buffer.append(chunkString)
+                Log.d(TAG, "🔄 Buffer size for $deviceAddress: ${buffer.length} chars")
+                
+                // Check of we een compleet JSON object hebben
+                val bufferContent = buffer.toString()
+                if (bufferContent.trim().endsWith("}")) {
+                    Log.d(TAG, "✅ Complete message received from $deviceAddress: $bufferContent")
+                    
+                    // Callback met complete data
+                    if (onDataReceived != null) {
+                        Log.d(TAG, "🔔 Calling onDataReceived callback")
+                        onDataReceived?.invoke(deviceAddress, bufferContent.trim().toByteArray())
+                    } else {
+                        Log.e(TAG, "❌ onDataReceived callback is NULL!")
+                    }
+                    
+                    // Clear buffer voor volgende bericht
+                    writeBuffers.remove(deviceAddress)
                 } else {
-                    Log.e(TAG, "❌ onDataReceived callback is NULL!")
+                    Log.d(TAG, "⏳ Incomplete JSON from $deviceAddress, waiting for more chunks...")
                 }
             }
             
@@ -390,7 +453,10 @@ class BlueCardGattServer(private val context: Context) {
         
         override fun onMtuChanged(device: BluetoothDevice?, mtu: Int) {
             super.onMtuChanged(device, mtu)
-            Log.d(TAG, "📏 MTU changed for ${device?.address}, new MTU=$mtu")
+            device?.let {
+                deviceMtuMap[it.address] = mtu
+                Log.d(TAG, "✅ MTU changed for ${it.address}, new MTU=$mtu (payload: ${mtu - 3} bytes)")
+            }
         }
         
         override fun onPhyUpdate(device: BluetoothDevice?, txPhy: Int, rxPhy: Int, status: Int) {

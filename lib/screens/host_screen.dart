@@ -74,12 +74,13 @@ class _HostScreenState extends State<HostScreen> {
   }
   
   Future<void> _requestPermissions() async {
-    // Permissions worden automatisch gevraagd door flutter_blue_plus
-    // bij het eerste gebruik
+    // Permissions worden automatisch gevraagd door de service
+    // bij het starten van de HostService
   }
   
   Future<void> _startServer() async {
     try {
+      // Start de Host Foreground Service
       await _bluetoothHost.startServer();
       _gameService.initializeGame();
       
@@ -92,6 +93,7 @@ class _HostScreenState extends State<HostScreen> {
   }
   
   Future<void> _stopServer() async {
+    // Stop de Host Service (sluit alle verbindingen en stopt de foreground service)
     await _bluetoothHost.stopServer();
     setState(() {
       _isServerStarted = false;

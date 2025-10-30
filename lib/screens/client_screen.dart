@@ -14,6 +14,7 @@ class _ClientScreenState extends State<ClientScreen> {
   final BluetoothClient _bluetoothClient = BluetoothClient();
   
   final List<String> _messages = [];
+  final List<PingInfo> _pings = [];
   bool _isConnected = false;
   bool _isSearching = false;
   String? _hostName;
@@ -43,13 +44,25 @@ class _ClientScreenState extends State<ClientScreen> {
       }
     });
     
+    // Luister naar ping berichten van host
+    _bluetoothClient.pingStream.listen((pingInfo) {
+      if (mounted) {
+        setState(() {
+          _pings.insert(0, pingInfo);
+          if (_pings.length > 20) {
+            _pings.removeLast();
+          }
+        });
+      }
+    });
+    
     // Luister naar verbindingsstatus
     _bluetoothClient.connectionStream.listen((connected) {
       if (mounted) {
         setState(() {
           _isConnected = connected;
-          if (connected && _bluetoothClient.hostDevice != null) {
-            _hostName = _bluetoothClient.hostDevice!.platformName;
+          if (connected) {
+            _hostName = _bluetoothClient.connectedHostName ?? 'BlueCard Host';
           } else {
             _hostName = null;
           }
@@ -74,8 +87,8 @@ class _ClientScreenState extends State<ClientScreen> {
   }
   
   Future<void> _requestPermissions() async {
-    // Permissions worden automatisch gevraagd door flutter_blue_plus
-    // bij het eerste gebruik
+    // Permissions worden automatisch gevraagd door de service
+    // bij het starten van de ClientService
   }
   
   Future<void> _searchAndConnect() async {
@@ -93,12 +106,10 @@ class _ClientScreenState extends State<ClientScreen> {
         return;
       }
       
-      // Probeer de scan te starten
-      _messages.insert(0, '🔍 Starting search for BlueCard hosts...');
-      _messages.insert(0, '💡 Make sure:');
-      _messages.insert(0, '   - Location is enabled on your device');
-      _messages.insert(0, '   - Bluetooth permissions are granted');
-      _messages.insert(0, '   - The host is running');
+      // Start de Client Foreground Service die automatisch zoekt naar hosts
+      _messages.insert(0, '🔍 Starting Client Service...');
+      _messages.insert(0, '💡 De service draait in de achtergrond');
+      _messages.insert(0, '💡 Je ontvangt een notificatie tijdens het zoeken');
       setState(() {});
       
       await _bluetoothClient.searchForHost();
@@ -113,6 +124,7 @@ class _ClientScreenState extends State<ClientScreen> {
   }
   
   Future<void> _disconnect() async {
+    // Stop de Client Service (sluit verbinding en stopt de foreground service)
     await _bluetoothClient.disconnect();
   }
   
@@ -283,6 +295,91 @@ class _ClientScreenState extends State<ClientScreen> {
               ],
             ),
           ),
+          
+          // Ping overzicht (alleen tonen als verbonden)
+          if (_isConnected && _pings.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(Icons.wifi_tethering, color: Colors.green[400], size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Pings van Host',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[400],
+                    ),
+                  ),
+                  Spacer(),
+                  Text(
+                    '${_pings.length} ontvangen',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            SizedBox(height: 8),
+            
+            Container(
+              margin: EdgeInsets.symmetric(horizontal: 16),
+              constraints: BoxConstraints(maxHeight: 150),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green[800]!),
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _pings.length,
+                itemBuilder: (context, index) {
+                  final ping = _pings[index];
+                  final latency = ping.receivedAt.difference(
+                    DateTime.fromMillisecondsSinceEpoch(ping.timestamp)
+                  ).inMilliseconds;
+                  
+                  return Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.grey[800]!,
+                          width: index < _pings.length - 1 ? 1 : 0,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.router, color: Colors.green[400], size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Ping van host',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ),
+                        Text(
+                          '${latency}ms',
+                          style: TextStyle(
+                            color: latency < 100 ? Colors.green[400] : Colors.orange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            
+            SizedBox(height: 16),
+          ],
           
           // Berichten log
           Padding(

@@ -1,40 +1,52 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/game_message.dart';
 
-/// BluetoothHost - GATT Server voor de kaartspel host
+/// BluetoothHost - GATT Server via Foreground Service
 /// Beheert de GATT service, notificaties naar clients, en verbindingen
 class BluetoothHost {
   static const String serviceUuid = '0000fff0-0000-1000-8000-00805f9b34fb';
   static const String characteristicUuid = '0000fff1-0000-1000-8000-00805f9b34fb';
   
-  static const MethodChannel _channel = MethodChannel('bluecard.gatt.server');
+  static const MethodChannel _channel = MethodChannel('bluecard.host.service');
   
-  final List<Map<String, String>> _connectedClients = []; // Changed to Map to store name & address
+  final List<Map<String, String>> _connectedClients = [];
   final StreamController<String> _messageController = StreamController.broadcast();
   final StreamController<int> _clientCountController = StreamController.broadcast();
   final StreamController<GameMessage> _gameMessageController = StreamController.broadcast();
   final StreamController<PingInfo> _pingController = StreamController.broadcast();
+  final StreamController<DateTime> _lastSyncController = StreamController.broadcast();
   
   bool _isAdvertising = false;
   bool _gameStarted = false;
   String? _currentHostName;
   String _playerId = 'host';
+  DateTime? _lastSyncTime;
   
   Stream<String> get messageStream => _messageController.stream;
   Stream<int> get clientCountStream => _clientCountController.stream;
   Stream<GameMessage> get gameMessageStream => _gameMessageController.stream;
   Stream<PingInfo> get pingStream => _pingController.stream;
+  Stream<DateTime> get lastSyncStream => _lastSyncController.stream;
   int get connectedClientCount => _connectedClients.length;
+  int get totalPlayerCount => _connectedClients.length + 1; // +1 voor host
   bool get isAdvertising => _isAdvertising;
   bool get gameStarted => _gameStarted;
   String? get hostName => _currentHostName;
   String get playerId => _playerId;
+  DateTime? get lastSyncTime => _lastSyncTime;
   
   BluetoothHost() {
-    // Setup method call handler voor callbacks van native code
+    // Setup method call handler voor callbacks van native service
     _channel.setMethodCallHandler(_handleNativeCallback);
+  }
+  
+  /// Helper om berichten zowel naar UI als debug log te sturen
+  void _log(String message) {
+    _messageController.add(message);
+    print('[BluetoothHost] $message'); // Flutter debug console
   }
   
   /// Handle callbacks van de native GATT server
@@ -63,118 +75,131 @@ class BluetoothHost {
   /// Client verbonden callback
   void _onClientConnected(String name, String address) {
     if (_gameStarted) {
-      _messageController.add('⛔ Game al gestart, client $name geweigerd');
+      _log('⛔ Game al gestart, client $name geweigerd');
       return;
     }
     
     _connectedClients.add({'name': name, 'address': address});
     _clientCountController.add(_connectedClients.length);
-    _messageController.add('📱 Client verbonden: $name ($address)');
-    _messageController.add('👥 Totaal clients: ${_connectedClients.length}');
+    _log('📱 Client verbonden: $name ($address)');
+    _log('👥 Totaal clients: ${_connectedClients.length}');
   }
   
   /// Client verbroken callback
   void _onClientDisconnected(String name, String address) {
     _connectedClients.removeWhere((client) => client['address'] == address);
     _clientCountController.add(_connectedClients.length);
-    _messageController.add('📴 Client verbroken: $name ($address)');
-    _messageController.add('👥 Totaal clients: ${_connectedClients.length}');
+    _log('📴 Client verbroken: $name ($address)');
+    _log('👥 Totaal clients: ${_connectedClients.length}');
   }
   
-  /// Data ontvangen callback - parse als GameMessage
+  /// Data ontvangen callback - parse als GameMessage indien mogelijk
   void _onDataReceived(String address, Uint8List data) {
     final String message = String.fromCharCodes(data);
-    _messageController.add('📨 Data ontvangen van $address: $message');
+    _log('📨 Data ontvangen van $address: $message');
     
     try {
-      // Parse als GameMessage
-      final gameMessage = GameMessage.fromJson(message);
+      // Probeer te parsen als JSON
+      final Map<String, dynamic> jsonData = jsonDecode(message);
       
-      // Broadcast naar alle clients inclusief host zelf
-      _broadcastGameMessage(gameMessage);
+      // Check of het een geldig GameMessage is (heeft type, timestamp, playerId)
+      if (jsonData.containsKey('type') && 
+          jsonData.containsKey('timestamp') && 
+          jsonData.containsKey('playerId')) {
+        
+        // Parse als GameMessage
+        final gameMessage = GameMessage.fromJson(message);
+        
+        // Broadcast naar alle clients inclusief host zelf
+        _broadcastGameMessage(gameMessage);
+        
+      } else {
+        // Niet een GameMessage, maar wel geldige JSON
+        _log('📩 Ontvangen custom bericht: type=${jsonData['type']}, message=${jsonData['message']}');
+      }
       
     } catch (e) {
-      _messageController.add('⚠️ Kon message niet parsen als JSON: $e');
+      _log('⚠️ Kon bericht niet parsen: $e');
     }
   }
   
   Stream<List<BluetoothDevice>> get clientsStream => throw UnimplementedError('Use clientCountStream instead');
   List<BluetoothDevice> get connectedClients => throw UnimplementedError('Not implemented for native GATT server');
   
-  /// Start de GATT server en begin met adverteren
+  /// Start de Host Service en begin met adverteren
   Future<void> startServer() async {
     try {
       // Genereer unieke host naam met BlueCard
       final hostId = DateTime.now().millisecondsSinceEpoch % 10000;
       _currentHostName = 'BlueCard-Host-$hostId';
       
-      _messageController.add('🚀 Starting native GATT server...');
-      _messageController.add('📱 Device name: $_currentHostName');
+      _log('🚀 Starting Host Service...');
+      _log('📱 Device name: $_currentHostName');
       
-      // Roep de native Kotlin methode aan
-      final bool success = await _channel.invokeMethod('startServer', {
+      // Start de Foreground Service
+      final bool success = await _channel.invokeMethod('startHostService', {
         'deviceName': _currentHostName,
       });
       
       if (success) {
         _isAdvertising = true;
-        _messageController.add('✅ GATT Server gestart!');
-        _messageController.add('📡 Service UUID: $serviceUuid');
-        _messageController.add('📝 Characteristic UUID: $characteristicUuid');
-        _messageController.add('🔍 Zoek naar "$_currentHostName" in je Bluetooth scanner');
+        _log('✅ Host Service gestart!');
+        _log('📡 Service UUID: $serviceUuid');
+        _log('📝 Characteristic UUID: $characteristicUuid');
+        _log('🔍 Zoek naar "$_currentHostName" in je Bluetooth scanner');
+        _log('🔔 Notificatie actief - service draait in achtergrond');
       } else {
-        _messageController.add('❌ GATT Server kon niet starten');
-        throw Exception('Failed to start GATT server');
+        _log('❌ Host Service kon niet starten');
+        throw Exception('Failed to start host service');
       }
       
     } catch (e) {
       _isAdvertising = false;
-      _messageController.add('❌ Fout bij starten server: $e');
+      _log('❌ Fout bij starten server: $e');
       rethrow;
     }
   }
   
-  /// Stop de GATT server
+  /// Stop de Host Service
   Future<void> stopServer() async {
     try {
-      _messageController.add('🛑 Stopping GATT server...');
+      _log('🛑 Stopping Host Service...');
       
-      // Roep de native Kotlin methode aan
-      await _channel.invokeMethod('stopServer');
+      // Stop de Foreground Service
+      await _channel.invokeMethod('stopHostService');
       
       _isAdvertising = false;
+      _gameStarted = false;
       _currentHostName = null;
       _connectedClients.clear();
       _clientCountController.add(0);
-      _messageController.add('✅ GATT Server gestopt');
+      _log('✅ Host Service gestopt');
       
     } catch (e) {
-      _messageController.add('❌ Fout bij stoppen server: $e');
+      _log('❌ Fout bij stoppen server: $e');
       rethrow;
     }
   }
   
-  /// Stuur notificatie naar alle clients
+  /// Stuur notificatie naar alle clients via de Service
   Future<void> sendNotificationToClients(String message) async {
     try {
-      _messageController.add('📤 Sending notification: $message');
+      if (_connectedClients.isEmpty) {
+        _log('⚠️ Geen clients verbonden');
+        return;
+      }
       
-      // Converteer string naar bytes
       final data = message.codeUnits;
       
-      // Roep de native Kotlin methode aan
-      final bool success = await _channel.invokeMethod('sendData', {
+      // Stuur via de Service naar alle clients
+      await _channel.invokeMethod('sendData', {
         'data': Uint8List.fromList(data),
       });
       
-      if (success) {
-        _messageController.add('✅ Notificatie verzonden naar alle clients');
-      } else {
-        _messageController.add('⚠️ Geen clients verbonden of verzenden mislukt');
-      }
+      _log('📤 Bericht verzonden naar ${_connectedClients.length} clients: "$message"');
       
     } catch (e) {
-      _messageController.add('❌ Fout bij verzenden notificatie: $e');
+      _log('❌ Fout bij verzenden notificatie: $e');
       rethrow;
     }
   }
@@ -182,17 +207,20 @@ class BluetoothHost {
   /// Start het spel - geen nieuwe clients meer toegestaan
   Future<void> startGame() async {
     if (_gameStarted) {
-      _messageController.add('⚠️ Game is al gestart');
+      _log('⚠️ Game is al gestart');
       return;
     }
     
     if (_connectedClients.isEmpty) {
-      _messageController.add('⚠️ Geen clients verbonden');
+      _log('⚠️ Geen clients verbonden');
       return;
     }
     
     _gameStarted = true;
-    _messageController.add('🎮 Game gestart! Geen nieuwe spelers meer toegestaan');
+    _log('🎮 Game gestart! Geen nieuwe spelers meer toegestaan');
+    
+    // Roep de native methode aan
+    await _channel.invokeMethod('startGame');
     
     // Stuur start_game message naar alle clients
     final startMessage = GameMessage(
@@ -232,7 +260,7 @@ class BluetoothHost {
       });
       
     } catch (e) {
-      _messageController.add('❌ Fout bij verzenden game message: $e');
+      _log('❌ Fout bij verzenden game message: $e');
       rethrow;
     }
   }
@@ -251,7 +279,7 @@ class BluetoothHost {
       ));
     }
     
-    _messageController.add('📡 Broadcast: ${message.type.name} van ${message.playerId}');
+    _log('📡 Broadcast: ${message.type.name} van ${message.playerId}');
   }
   
   void dispose() {
