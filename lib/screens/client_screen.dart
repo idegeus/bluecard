@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/bluetooth_client.dart';
 import '../models/game_message.dart';
@@ -19,12 +20,14 @@ class _ClientScreenState extends State<ClientScreen> {
   bool _isConnected = false;
   bool _isSearching = false;
   String? _hostName;
-  int _playerCount = 0;
-  List<String> _playerIds = [];
+  
+  // Stream subscriptions om te kunnen cancellen
+  late final List<StreamSubscription> _subscriptions;
   
   @override
   void initState() {
     super.initState();
+    _subscriptions = [];
     _setupListeners();
     _requestPermissions();
     
@@ -36,7 +39,7 @@ class _ClientScreenState extends State<ClientScreen> {
   
   void _setupListeners() {
     // Luister naar berichten
-    _bluetoothClient.messageStream.listen((message) {
+    _subscriptions.add(_bluetoothClient.messageStream.listen((message) {
       if (mounted) {
         setState(() {
           _messages.insert(0, message);
@@ -50,10 +53,10 @@ class _ClientScreenState extends State<ClientScreen> {
       if (message.contains('📨 Notificatie van host:')) {
         _showNotification(message.substring(message.indexOf(':') + 2));
       }
-    });
+    }));
     
     // Luister naar verbindingsstatus
-    _bluetoothClient.connectionStream.listen((connected) {
+    _subscriptions.add(_bluetoothClient.connectionStream.listen((connected) {
       if (mounted) {
         setState(() {
           _isConnected = connected;
@@ -65,10 +68,10 @@ class _ClientScreenState extends State<ClientScreen> {
           }
         });
       }
-    });
+    }));
     
     // Luister naar game messages voor auto-navigatie
-    _bluetoothClient.gameMessageStream.listen((gameMessage) {
+    _subscriptions.add(_bluetoothClient.gameMessageStream.listen((gameMessage) {
       if (!mounted) return;
       
       switch (gameMessage.type) {
@@ -86,19 +89,14 @@ class _ClientScreenState extends State<ClientScreen> {
           break;
           
         case GameMessageType.playerJoined:
-          // Update player lijst
-          if (gameMessage.content != null) {
-            setState(() {
-              _playerCount = gameMessage.content!['playerCount'] ?? 0;
-              _playerIds = List<String>.from(gameMessage.content!['playerIds'] ?? []);
-            });
-          }
+          // Trigger rebuild voor player lijst update
+          setState(() {});
           break;
           
         default:
           break;
       }
-    });
+    }));
   }
   
   Future<void> _requestPermissions() async {
@@ -193,6 +191,11 @@ class _ClientScreenState extends State<ClientScreen> {
   
   @override
   void dispose() {
+    // Cancel alle stream subscriptions om memory leaks te voorkomen
+    for (var subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    
     // NIET de service disposen - deze moet actief blijven voor andere schermen
     // De service wordt alleen gedisposed bij quitGame()
     // _bluetoothClient.dispose();
@@ -328,10 +331,10 @@ class _ClientScreenState extends State<ClientScreen> {
           ),
           
           // Spelers lijst (alleen tonen als verbonden en er spelers zijn)
-          if (_isConnected && _playerIds.isNotEmpty) ...[
+          if (_isConnected && _bluetoothClient.playerIds.isNotEmpty) ...[
             PlayerList(
-              playerCount: _playerCount,
-              playerIds: _playerIds,
+              playerCount: _bluetoothClient.playerCount,
+              playerIds: _bluetoothClient.playerIds,
             ),
             SizedBox(height: 16),
           ],

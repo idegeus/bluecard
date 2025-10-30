@@ -39,12 +39,10 @@ class _HostGameScreenState extends State<HostGameScreen> {
       }
     });
     
-    // Luister naar client count updates
-    widget.bluetoothHost.clientCountStream.listen((count) {
+    // Luister naar player IDs updates voor rebuild
+    widget.bluetoothHost.playerIdsStream.listen((_) {
       if (mounted) {
-        setState(() {
-          _playerCount = count + 1; // +1 voor host
-        });
+        setState(() {});
       }
     });
     

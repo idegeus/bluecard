@@ -13,7 +13,6 @@ class BluetoothHost {
   
   final List<Map<String, String>> _connectedClients = [];
   final StreamController<String> _messageController = StreamController.broadcast();
-  final StreamController<int> _clientCountController = StreamController.broadcast();
   final StreamController<GameMessage> _gameMessageController = StreamController.broadcast();
   final StreamController<DateTime> _lastSyncController = StreamController.broadcast();
   final StreamController<List<String>> _playerIdsController = StreamController.broadcast();
@@ -26,7 +25,6 @@ class BluetoothHost {
   Timer? _pingTimer;
   
   Stream<String> get messageStream => _messageController.stream;
-  Stream<int> get clientCountStream => _clientCountController.stream;
   Stream<GameMessage> get gameMessageStream => _gameMessageController.stream;
   Stream<DateTime> get lastSyncStream => _lastSyncController.stream;
   Stream<List<String>> get playerIdsStream => _playerIdsController.stream;
@@ -94,7 +92,6 @@ class BluetoothHost {
       'address': address,
       'playerId': playerId,
     });
-    _clientCountController.add(_connectedClients.length);
     _playerIdsController.add(playerIds); // Broadcast nieuwe player lijst
     _log('📱 Client verbonden: $name ($playerId)');
     _log('👥 Totaal clients: ${_connectedClients.length}');
@@ -109,7 +106,6 @@ class BluetoothHost {
   /// Client verbroken callback
   void _onClientDisconnected(String name, String address) {
     _connectedClients.removeWhere((client) => client['address'] == address);
-    _clientCountController.add(_connectedClients.length);
     _playerIdsController.add(playerIds); // Broadcast nieuwe player lijst
     _log('📴 Client verbroken: $name ($address)');
     _log('👥 Totaal clients: ${_connectedClients.length}');
@@ -191,7 +187,6 @@ class BluetoothHost {
       _gameStarted = false;
       _currentHostName = null;
       _connectedClients.clear();
-      _clientCountController.add(0);
       _playerIdsController.add(['host']); // Reset naar alleen host
       _log('✅ Host Service gestopt');
       
@@ -259,13 +254,18 @@ class BluetoothHost {
   
   /// Stuur een ping
   Future<void> sendPing() async {
+    final now = DateTime.now();
     final pingMessage = GameMessage(
       type: GameMessageType.ping,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
+      timestamp: now.millisecondsSinceEpoch,
       playerId: _playerId,
     );
     
     await _sendGameMessage(pingMessage);
+    
+    // Update last sync time
+    _lastSyncTime = now;
+    _lastSyncController.add(now);
     
     // Broadcast ook naar host zelf
     _broadcastGameMessage(pingMessage);
@@ -381,7 +381,6 @@ class BluetoothHost {
   
   void dispose() {
     _messageController.close();
-    _clientCountController.close();
     _gameMessageController.close();
     _lastSyncController.close();
     _playerIdsController.close();

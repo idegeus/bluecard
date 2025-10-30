@@ -21,9 +21,6 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  DateTime? _lastSync;
-  int _clientCount = 0;
-  
   @override
   void initState() {
     super.initState();
@@ -31,33 +28,7 @@ class _GameScreenState extends State<GameScreen> {
   }
   
   void _setupListeners() {
-    if (widget.isHost && widget.bluetoothHost != null) {
-      // Host listeners
-      widget.bluetoothHost!.lastSyncStream.listen((syncTime) {
-        if (mounted) {
-          setState(() {
-            _lastSync = syncTime;
-          });
-        }
-      });
-      
-      widget.bluetoothHost!.clientCountStream.listen((count) {
-        if (mounted) {
-          setState(() {
-            _clientCount = count;
-          });
-        }
-      });
-    } else if (!widget.isHost && widget.bluetoothClient != null) {
-      // Client listeners
-      widget.bluetoothClient!.lastSyncStream.listen((syncTime) {
-        if (mounted) {
-          setState(() {
-            _lastSync = syncTime;
-          });
-        }
-      });
-      
+    if (!widget.isHost && widget.bluetoothClient != null) {
       // Luister naar goodbye messages van host
       widget.bluetoothClient!.gameMessageStream.listen((gameMessage) {
         if (gameMessage.type == GameMessageType.goodbye && mounted) {
@@ -111,9 +82,24 @@ class _GameScreenState extends State<GameScreen> {
   
   void _showConnectionInfo() {
     final now = DateTime.now();
-    final timeSinceLastSync = _lastSync != null 
-        ? now.difference(_lastSync!).inSeconds 
+    
+    // Haal lastSync direct uit de service
+    final DateTime? lastSync = widget.isHost 
+        ? widget.bluetoothHost?.lastSyncTime 
+        : widget.bluetoothClient?.lastSyncTime;
+    
+    final timeSinceLastSync = lastSync != null 
+        ? now.difference(lastSync).inSeconds 
         : null;
+    
+    // Haal playerIds en count direct uit de service
+    final List<String> playerIds = widget.isHost
+        ? (widget.bluetoothHost?.playerIds ?? [])
+        : (widget.bluetoothClient?.playerIds ?? []);
+    
+    final int playerCount = widget.isHost
+        ? (widget.bluetoothHost?.totalPlayerCount ?? 0)
+        : (widget.bluetoothClient?.playerCount ?? 0);
     
     showDialog(
       context: context,
@@ -140,14 +126,12 @@ class _GameScreenState extends State<GameScreen> {
             ),
             SizedBox(height: 12),
             
-            if (widget.isHost) ...[
-              _buildInfoRow(
-                icon: Icons.people,
-                label: 'Clients',
-                value: '$_clientCount verbonden',
-              ),
-              SizedBox(height: 12),
-            ],
+            _buildInfoRow(
+              icon: Icons.people,
+              label: 'Spelers',
+              value: '$playerCount (${playerIds.join(", ")})',
+            ),
+            SizedBox(height: 12),
             
             _buildInfoRow(
               icon: Icons.wifi_tethering,
@@ -368,16 +352,16 @@ class _GameScreenState extends State<GameScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  if (widget.isHost) ...[
-                    SizedBox(height: 8),
-                    Text(
-                      '$_clientCount speler(s) verbonden',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[400],
-                      ),
+                  SizedBox(height: 8),
+                  Text(
+                    widget.isHost
+                        ? '${widget.bluetoothHost?.connectedClientCount ?? 0} speler(s) verbonden'
+                        : '${widget.bluetoothClient?.playerCount ?? 0} totale spelers',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[400],
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/bluetooth_host.dart';
 import '../services/game_service.dart';
@@ -19,12 +20,14 @@ class _HostScreenState extends State<HostScreen> {
   
   final List<String> _messages = [];
   bool _isServerStarted = false;
-  int _clientCount = 0;
-  List<String> _playerIds = ['host']; // Altijd host + clients
+  
+  // Stream subscriptions om te kunnen cancellen
+  late final List<StreamSubscription> _subscriptions;
   
   @override
   void initState() {
     super.initState();
+    _subscriptions = [];
     _setupListeners();
     _requestPermissions();
     
@@ -36,31 +39,26 @@ class _HostScreenState extends State<HostScreen> {
   
   void _setupListeners() {
     // Luister naar Bluetooth berichten
-    _bluetoothHost.messageStream.listen((message) {
-      setState(() {
-        _messages.insert(0, message);
-        if (_messages.length > 50) {
-          _messages.removeLast();
-        }
-      });
-    });
+    _subscriptions.add(_bluetoothHost.messageStream.listen((message) {
+      if (mounted) {
+        setState(() {
+          _messages.insert(0, message);
+          if (_messages.length > 50) {
+            _messages.removeLast();
+          }
+        });
+      }
+    }));
     
-    // Luister naar client count updates
-    _bluetoothHost.clientCountStream.listen((count) {
-      setState(() {
-        _clientCount = count;
-      });
-    });
-    
-    // Luister naar player IDs updates
-    _bluetoothHost.playerIdsStream.listen((playerIds) {
-      setState(() {
-        _playerIds = playerIds;
-      });
-    });
+    // Trigger rebuild wanneer player IDs updaten
+    _subscriptions.add(_bluetoothHost.playerIdsStream.listen((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    }));
     
     // Luister naar game messages voor navigatie
-    _bluetoothHost.gameMessageStream.listen((gameMessage) {
+    _subscriptions.add(_bluetoothHost.gameMessageStream.listen((gameMessage) {
       print('🎮 HostScreen received gameMessage: ${gameMessage.type}');
       if (gameMessage.type == GameMessageType.startGame && mounted) {
         print('🎮 HostScreen navigating to GameScreen...');
@@ -75,17 +73,19 @@ class _HostScreenState extends State<HostScreen> {
           ),
         );
       }
-    });
+    }));
     
     // Luister naar game events
-    _gameService.eventStream.listen((event) {
-      setState(() {
-        _messages.insert(0, event);
-        if (_messages.length > 50) {
-          _messages.removeLast();
-        }
-      });
-    });
+    _subscriptions.add(_gameService.eventStream.listen((event) {
+      if (mounted) {
+        setState(() {
+          _messages.insert(0, event);
+          if (_messages.length > 50) {
+            _messages.removeLast();
+          }
+        });
+      }
+    }));
   }
   
   Future<void> _requestPermissions() async {
@@ -142,6 +142,11 @@ class _HostScreenState extends State<HostScreen> {
   
   @override
   void dispose() {
+    // Cancel alle stream subscriptions om memory leaks te voorkomen
+    for (var subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    
     // NIET de services disposen - deze moeten actief blijven voor andere schermen
     // De services worden alleen gedisposed bij quitGame()
     // _bluetoothHost.dispose();
@@ -165,7 +170,7 @@ class _HostScreenState extends State<HostScreen> {
                   children: [
                     Icon(Icons.circle, size: 12, color: Colors.green[300]),
                     SizedBox(width: 8),
-                    Text('$_clientCount clients'),
+                    Text('${_bluetoothHost.connectedClientCount} clients'),
                   ],
                 ),
               ),
@@ -281,10 +286,10 @@ class _HostScreenState extends State<HostScreen> {
           ),
           
           // Spelers lijst
-          if (_playerIds.isNotEmpty) ...[
+          if (_bluetoothHost.playerIds.isNotEmpty) ...[
             PlayerList(
               playerCount: _bluetoothHost.totalPlayerCount,
-              playerIds: _playerIds,
+              playerIds: _bluetoothHost.playerIds,
             ),
             SizedBox(height: 16),
           ],

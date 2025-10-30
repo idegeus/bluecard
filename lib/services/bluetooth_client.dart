@@ -24,6 +24,9 @@ class BluetoothClient {
   Timer? _pingTimer;
   Timer? _connectionTimeoutTimer;
   DateTime? _lastDataReceived;
+  DateTime? _lastSyncTime;
+  List<String> _playerIds = [];
+  int _playerCount = 0;
   static const Duration _connectionTimeout = Duration(seconds: 30);
   
   Stream<String> get messageStream => _messageController.stream;
@@ -34,6 +37,9 @@ class BluetoothClient {
   bool get isScanning => _isScanning;
   String? get connectedHostName => _connectedHostName;
   String get playerId => _playerId;
+  DateTime? get lastSyncTime => _lastSyncTime;
+  List<String> get playerIds => _playerIds;
+  int get playerCount => _playerCount;
   
   BluetoothClient() {
     // Setup callback handlers voor berichten van de ClientService
@@ -91,8 +97,10 @@ class BluetoothClient {
           switch (gameMessage.type) {
             case GameMessageType.ping:
               // Update last sync time
+              final now = DateTime.now();
+              _lastSyncTime = now;
               if (!_lastSyncController.isClosed) {
-                _lastSyncController.add(DateTime.now());
+                _lastSyncController.add(now);
               }
               break;
               
@@ -102,10 +110,10 @@ class BluetoothClient {
               
             case GameMessageType.playerJoined:
               if (gameMessage.content != null) {
-                final playerCount = gameMessage.content!['playerCount'];
-                final playerIds = gameMessage.content!['playerIds'];
-                _log('👥 Speler toegevoegd! Totaal: $playerCount spelers');
-                _log('📋 Spelers: ${(playerIds as List).join(", ")}');
+                _playerCount = gameMessage.content!['playerCount'] ?? 0;
+                _playerIds = List<String>.from(gameMessage.content!['playerIds'] ?? []);
+                _log('👥 Speler toegevoegd! Totaal: $_playerCount spelers');
+                _log('📋 Spelers: ${_playerIds.join(", ")}');
               }
               break;
               
