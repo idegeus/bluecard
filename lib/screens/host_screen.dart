@@ -161,21 +161,6 @@ class _HostScreenState extends State<HostScreen> {
       appBar: AppBar(
         title: Text('Host'),
         backgroundColor: Colors.green[700],
-        actions: [
-          if (_isServerStarted)
-            Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Center(
-                child: Row(
-                  children: [
-                    Icon(Icons.circle, size: 12, color: Colors.green[300]),
-                    SizedBox(width: 8),
-                    Text('${_bluetoothHost.connectedClientCount} clients'),
-                  ],
-                ),
-              ),
-            ),
-        ],
       ),
       body: Column(
         children: [
