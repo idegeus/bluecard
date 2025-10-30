@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/bluetooth_client.dart';
 import '../models/game_message.dart';
 import '../widgets/player_list.dart';
+import '../widgets/message_log.dart';
 import 'client_game_screen.dart';
 
 class ClientScreen extends StatefulWidget {
@@ -58,6 +59,7 @@ class _ClientScreenState extends State<ClientScreen> {
           _isConnected = connected;
           if (connected) {
             _hostName = _bluetoothClient.connectedHostName ?? 'BlueCard Host';
+            _isSearching = false; // Stop searching wanneer verbonden
           } else {
             _hostName = null;
           }
@@ -126,9 +128,21 @@ class _ClientScreenState extends State<ClientScreen> {
       
       await _bluetoothClient.searchForHost();
       
+      // _isSearching blijft true tot verbinding gemaakt is of timeout
+      // De connectionStream listener zet het op false bij verbinding
+      
+      // Timeout na 30 seconden als geen verbinding
+      Future.delayed(Duration(seconds: 30), () {
+        if (_isSearching && !_isConnected && mounted) {
+          setState(() {
+            _isSearching = false;
+          });
+          _showError('Geen host gevonden. Probeer opnieuw.');
+        }
+      });
+      
     } catch (e) {
       _showError('Fout bij zoeken: $e');
-    } finally {
       setState(() {
         _isSearching = false;
       });
@@ -320,60 +334,8 @@ class _ClientScreenState extends State<ClientScreen> {
           ],
           
           // Berichten log
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Icon(Icons.article, color: Colors.grey[600], size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'Berichten Log',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[400],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          SizedBox(height: 8),
-          
           Expanded(
-            child: Container(
-              margin: EdgeInsets.all(16),
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[800]!),
-              ),
-              child: _messages.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Geen berichten',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    )
-                  : ListView.builder(
-                      reverse: false,
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Text(
-                            _messages[index],
-                            style: TextStyle(
-                              color: Colors.blue[300],
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
+            child: MessageLog(messages: _messages),
           ),
         ],
       ),

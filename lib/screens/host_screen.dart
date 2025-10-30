@@ -3,6 +3,7 @@ import '../services/bluetooth_host.dart';
 import '../services/game_service.dart';
 import '../models/game_message.dart';
 import '../widgets/player_list.dart';
+import '../widgets/message_log.dart';
 
 class HostScreen extends StatefulWidget {
   const HostScreen({Key? key}) : super(key: key);
@@ -276,60 +277,8 @@ class _HostScreenState extends State<HostScreen> {
           ],
           
           // Berichten log
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Icon(Icons.article, color: Colors.grey[600], size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'Berichten Log',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[400],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          SizedBox(height: 8),
-          
           Expanded(
-            child: Container(
-              margin: EdgeInsets.all(16),
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[800]!),
-              ),
-              child: _messages.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Geen berichten',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    )
-                  : ListView.builder(
-                      reverse: false,
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Text(
-                            _messages[index],
-                            style: TextStyle(
-                              color: Colors.green[300],
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
+            child: MessageLog(messages: _messages),
           ),
         ],
       ),
