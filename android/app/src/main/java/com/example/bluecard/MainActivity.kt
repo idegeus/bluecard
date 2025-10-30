@@ -45,6 +45,32 @@ class MainActivity: FlutterActivity() {
         
         hostMethodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
+                "isBluetoothEnabled" -> {
+                    val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
+                    val isEnabled = bluetoothManager.adapter?.isEnabled ?: false
+                    result.success(isEnabled)
+                }
+                "enableBluetooth" -> {
+                    val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
+                    val adapter = bluetoothManager.adapter
+                    
+                    if (adapter == null) {
+                        result.success(false)
+                    } else if (!adapter.isEnabled) {
+                        // Probeer Bluetooth aan te zetten via intent
+                        try {
+                            val enableBtIntent = Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                            startActivityForResult(enableBtIntent, 2001)
+                            // Geef true terug - gebruiker ziet dialog
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error enabling Bluetooth", e)
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(true)
+                    }
+                }
                 "startHostService" -> {
                     val deviceName = call.argument<String>("deviceName") ?: "BlueCard-Host"
                     
@@ -88,6 +114,32 @@ class MainActivity: FlutterActivity() {
         
         clientMethodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
+                "isBluetoothEnabled" -> {
+                    val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
+                    val isEnabled = bluetoothManager.adapter?.isEnabled ?: false
+                    result.success(isEnabled)
+                }
+                "enableBluetooth" -> {
+                    val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
+                    val adapter = bluetoothManager.adapter
+                    
+                    if (adapter == null) {
+                        result.success(false)
+                    } else if (!adapter.isEnabled) {
+                        // Probeer Bluetooth aan te zetten via intent
+                        try {
+                            val enableBtIntent = Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                            startActivityForResult(enableBtIntent, 2001)
+                            // Geef true terug - gebruiker ziet dialog
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error enabling Bluetooth", e)
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(true)
+                    }
+                }
                 "startClientService" -> {
                     // Start service zonder device address - service zal zelf scannen
                     if (checkAndRequestPermissions()) {

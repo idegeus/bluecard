@@ -141,6 +141,24 @@ class BluetoothHost {
   /// Start de Host Service en begin met adverteren
   Future<void> startServer() async {
     try {
+      // Check of Bluetooth aan staat
+      final bool bluetoothEnabled = await _channel.invokeMethod('isBluetoothEnabled');
+      
+      if (!bluetoothEnabled) {
+        _log('⚠️ Bluetooth is uitgeschakeld');
+        _log('📱 Probeer Bluetooth aan te zetten...');
+        
+        // Vraag om Bluetooth aan te zetten
+        final bool enabled = await _channel.invokeMethod('enableBluetooth');
+        
+        if (!enabled) {
+          _log('❌ Bluetooth kon niet worden aangezet');
+          throw Exception('Bluetooth is uitgeschakeld. Zet Bluetooth aan om door te gaan.');
+        }
+        
+        _log('✅ Bluetooth aangezet');
+      }
+      
       // Genereer unieke host naam met BlueCard
       final hostId = DateTime.now().millisecondsSinceEpoch % 10000;
       _currentHostName = 'BlueCard-Host-$hostId';

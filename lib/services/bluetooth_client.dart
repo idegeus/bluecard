@@ -154,6 +154,25 @@ class BluetoothClient {
   /// Start de Client Service en zoek naar een host
   Future<void> searchForHost() async {
     try {
+      // Check of Bluetooth aan staat
+      final bool bluetoothEnabled = await _channel.invokeMethod('isBluetoothEnabled');
+      
+      if (!bluetoothEnabled) {
+        _log('⚠️ Bluetooth is uitgeschakeld');
+        _log('📱 Probeer Bluetooth aan te zetten...');
+        
+        // Vraag om Bluetooth aan te zetten
+        final bool enabled = await _channel.invokeMethod('enableBluetooth');
+        
+        if (!enabled) {
+          _log('❌ Bluetooth kon niet worden aangezet');
+          _isScanning = false;
+          throw Exception('Bluetooth is uitgeschakeld. Zet Bluetooth aan om door te gaan.');
+        }
+        
+        _log('✅ Bluetooth aangezet');
+      }
+      
       _isScanning = true;
       _log('🔍 Starting Client Service...');
       _log('📡 Service UUID: $serviceUuid');
