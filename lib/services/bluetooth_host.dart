@@ -15,7 +15,6 @@ class BluetoothHost {
   final StreamController<String> _messageController = StreamController.broadcast();
   final StreamController<int> _clientCountController = StreamController.broadcast();
   final StreamController<GameMessage> _gameMessageController = StreamController.broadcast();
-  final StreamController<PingInfo> _pingController = StreamController.broadcast();
   final StreamController<DateTime> _lastSyncController = StreamController.broadcast();
   
   bool _isAdvertising = false;
@@ -23,11 +22,11 @@ class BluetoothHost {
   String? _currentHostName;
   String _playerId = 'host';
   DateTime? _lastSyncTime;
+  Timer? _pingTimer;
   
   Stream<String> get messageStream => _messageController.stream;
   Stream<int> get clientCountStream => _clientCountController.stream;
   Stream<GameMessage> get gameMessageStream => _gameMessageController.stream;
-  Stream<PingInfo> get pingStream => _pingController.stream;
   Stream<DateTime> get lastSyncStream => _lastSyncController.stream;
   int get connectedClientCount => _connectedClients.length;
   int get totalPlayerCount => _connectedClients.length + 1; // +1 voor host
@@ -136,6 +135,7 @@ class BluetoothHost {
       
       if (success) {
         _isAdvertising = true;
+        _startPingTimer();
         _log('✅ Host Service gestart!');
         _log('📡 Service UUID: $serviceUuid');
         _log('📝 Characteristic UUID: $characteristicUuid');
@@ -157,6 +157,8 @@ class BluetoothHost {
   Future<void> stopServer() async {
     try {
       _log('🛑 Stopping Host Service...');
+      
+      _stopPingTimer();
       
       // Stop de Foreground Service
       await _channel.invokeMethod('stopHostService');
@@ -242,6 +244,25 @@ class BluetoothHost {
     _broadcastGameMessage(pingMessage);
   }
   
+  /// Start automatische ping timer (elke 10 seconden)
+  void _startPingTimer() {
+    _stopPingTimer(); // Stop oude timer indien actief
+    
+    _pingTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+      if (_isAdvertising && _connectedClients.isNotEmpty) {
+        sendPing();
+      }
+    });
+    
+    _log('⏱️ Automatische ping gestart (elke 10s)');
+  }
+  
+  /// Stop automatische ping timer
+  void _stopPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+  }
+  
   /// Stuur een custom message naar alle clients
   Future<void> sendMessage({
     required GameMessageType type,
@@ -281,15 +302,6 @@ class BluetoothHost {
     // Add to game message stream
     _gameMessageController.add(message);
     
-    // Add to ping stream if it's a ping
-    if (message.type == GameMessageType.ping) {
-      _pingController.add(PingInfo(
-        timestamp: message.timestamp,
-        playerId: message.playerId,
-        receivedAt: DateTime.now(),
-      ));
-    }
-    
     _log('📡 Broadcast: ${message.type.name} van ${message.playerId}');
   }
   
@@ -297,6 +309,6 @@ class BluetoothHost {
     _messageController.close();
     _clientCountController.close();
     _gameMessageController.close();
-    _pingController.close();
+    _lastSyncController.close();
   }
 }

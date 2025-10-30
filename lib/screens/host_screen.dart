@@ -15,7 +15,6 @@ class _HostScreenState extends State<HostScreen> {
   final GameService _gameService = GameService();
   
   final List<String> _messages = [];
-  final List<PingInfo> _pings = [];
   bool _isServerStarted = false;
   int _clientCount = 0;
   
@@ -24,6 +23,11 @@ class _HostScreenState extends State<HostScreen> {
     super.initState();
     _setupListeners();
     _requestPermissions();
+    
+    // Automatisch server starten zodra screen geladen is
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startServer();
+    });
   }
   
   void _setupListeners() {
@@ -41,16 +45,6 @@ class _HostScreenState extends State<HostScreen> {
     _bluetoothHost.clientCountStream.listen((count) {
       setState(() {
         _clientCount = count;
-      });
-    });
-    
-    // Luister naar ping updates
-    _bluetoothHost.pingStream.listen((pingInfo) {
-      setState(() {
-        _pings.insert(0, pingInfo);
-        if (_pings.length > 20) {
-          _pings.removeLast();
-        }
       });
     });
     
@@ -262,64 +256,6 @@ class _HostScreenState extends State<HostScreen> {
               ],
             ),
           ),
-          
-          // Ping overzicht
-          if (_pings.isNotEmpty) ...[
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.wifi_tethering, color: Colors.grey[600], size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Ping Overzicht',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[400],
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[850],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: ListView.builder(
-                      itemCount: _pings.length,
-                      itemBuilder: (context, index) {
-                        final ping = _pings[index];
-                        return ListTile(
-                          dense: true,
-                          leading: Icon(Icons.person, color: Colors.blue, size: 16),
-                          title: Text(
-                            'Player: ${ping.playerId}',
-                            style: TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                          subtitle: Text(
-                            'Timestamp: ${ping.timestamp}',
-                            style: TextStyle(color: Colors.grey[500], fontSize: 10),
-                          ),
-                          trailing: Text(
-                            DateTime.fromMillisecondsSinceEpoch(ping.timestamp)
-                                .toString()
-                                .substring(11, 19),
-                            style: TextStyle(color: Colors.grey[400], fontSize: 10),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
           
           // Berichten log
           Padding(

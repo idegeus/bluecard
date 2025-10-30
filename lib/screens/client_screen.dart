@@ -14,7 +14,6 @@ class _ClientScreenState extends State<ClientScreen> {
   final BluetoothClient _bluetoothClient = BluetoothClient();
   
   final List<String> _messages = [];
-  final List<PingInfo> _pings = [];
   bool _isConnected = false;
   bool _isSearching = false;
   String? _hostName;
@@ -24,6 +23,11 @@ class _ClientScreenState extends State<ClientScreen> {
     super.initState();
     _setupListeners();
     _requestPermissions();
+    
+    // Automatisch beginnen met zoeken naar hosts zodra screen geladen is
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchAndConnect();
+    });
   }
   
   void _setupListeners() {
@@ -41,18 +45,6 @@ class _ClientScreenState extends State<ClientScreen> {
       // Toon notificatie bij ontvangen berichten van host
       if (message.contains('📨 Notificatie van host:')) {
         _showNotification(message.substring(message.indexOf(':') + 2));
-      }
-    });
-    
-    // Luister naar ping berichten van host
-    _bluetoothClient.pingStream.listen((pingInfo) {
-      if (mounted) {
-        setState(() {
-          _pings.insert(0, pingInfo);
-          if (_pings.length > 20) {
-            _pings.removeLast();
-          }
-        });
       }
     });
     
@@ -297,91 +289,6 @@ class _ClientScreenState extends State<ClientScreen> {
               ],
             ),
           ),
-          
-          // Ping overzicht (alleen tonen als verbonden)
-          if (_isConnected && _pings.isNotEmpty) ...[
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Icon(Icons.wifi_tethering, color: Colors.green[400], size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Pings van Host',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[400],
-                    ),
-                  ),
-                  Spacer(),
-                  Text(
-                    '${_pings.length} ontvangen',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            SizedBox(height: 8),
-            
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              constraints: BoxConstraints(maxHeight: 150),
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green[800]!),
-              ),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _pings.length,
-                itemBuilder: (context, index) {
-                  final ping = _pings[index];
-                  final latency = ping.receivedAt.difference(
-                    DateTime.fromMillisecondsSinceEpoch(ping.timestamp)
-                  ).inMilliseconds;
-                  
-                  return Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          color: Colors.grey[800]!,
-                          width: index < _pings.length - 1 ? 1 : 0,
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.router, color: Colors.green[400], size: 16),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Ping van host',
-                            style: TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                        ),
-                        Text(
-                          '${latency}ms',
-                          style: TextStyle(
-                            color: latency < 100 ? Colors.green[400] : Colors.orange,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            
-            SizedBox(height: 16),
-          ],
           
           // Berichten log
           Padding(

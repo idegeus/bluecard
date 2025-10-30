@@ -15,18 +15,20 @@ class BluetoothClient {
   final StreamController<String> _messageController = StreamController.broadcast();
   final StreamController<bool> _connectionController = StreamController.broadcast();
   final StreamController<GameMessage> _gameMessageController = StreamController.broadcast();
-  final StreamController<PingInfo> _pingController = StreamController.broadcast();
   final StreamController<DateTime> _lastSyncController = StreamController.broadcast();
   
   bool _isConnected = false;
   bool _isScanning = false;
   String _playerId = 'client';
   String? _connectedHostName;
+  Timer? _pingTimer;
+  Timer? _connectionTimeoutTimer;
+  DateTime? _lastDataReceived;
+  static const Duration _connectionTimeout = Duration(seconds: 30);
   
   Stream<String> get messageStream => _messageController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
   Stream<GameMessage> get gameMessageStream => _gameMessageController.stream;
-  Stream<PingInfo> get pingStream => _pingController.stream;
   Stream<DateTime> get lastSyncStream => _lastSyncController.stream;
   bool get isConnected => _isConnected;
   bool get isScanning => _isScanning;
@@ -59,15 +61,24 @@ class BluetoothClient {
         if (connected) {
           _log('✅ Verbonden met host service');
           _isScanning = false;
+          _lastDataReceived = DateTime.now();
+          _startPingTimer();
+          _resetConnectionTimeout();
         } else {
           _log('⚠️ Verbinding verbroken');
           _connectedHostName = null;
+          _stopPingTimer();
+          _stopConnectionTimeout();
         }
         break;
         
       case 'onDataReceived':
         final Uint8List data = call.arguments['data'];
         final message = String.fromCharCodes(data);
+        
+        // Update laatste data ontvangen tijd
+        _lastDataReceived = DateTime.now();
+        _resetConnectionTimeout();
         
         // Alle berichten zijn nu GameMessages
         try {
@@ -79,13 +90,6 @@ class BluetoothClient {
           // Handle specifieke message types
           switch (gameMessage.type) {
             case GameMessageType.ping:
-              final pingInfo = PingInfo(
-                timestamp: gameMessage.timestamp,
-                playerId: gameMessage.playerId,
-                receivedAt: DateTime.now(),
-              );
-              _pingController.add(pingInfo);
-              
               // Update last sync time
               if (!_lastSyncController.isClosed) {
                 _lastSyncController.add(DateTime.now());
@@ -158,6 +162,7 @@ class BluetoothClient {
   Future<void> sendPing() async {
     if (!_isConnected) {
       _log('⚠️ Niet verbonden met host');
+      _stopPingTimer(); // Stop timer als niet verbonden
       return;
     }
     
@@ -171,16 +176,81 @@ class BluetoothClient {
       final jsonString = pingMessage.toJson();
       final bytes = jsonString.codeUnits;
       
-      await _channel.invokeMethod('sendDataToHost', {
+      final bool success = await _channel.invokeMethod('sendDataToHost', {
         'data': Uint8List.fromList(bytes),
       });
       
-      _log('📤 Ping verzonden naar host');
+      if (success) {
+        _log('📤 Ping verzonden naar host');
+      } else {
+        _log('❌ Ping verzenden mislukt - mogelijk niet verbonden');
+        _isConnected = false;
+        _connectionController.add(false);
+        _stopPingTimer();
+      }
       
     } catch (e) {
       _log('❌ Fout bij verzenden ping: $e');
-      rethrow;
+      _isConnected = false;
+      _connectionController.add(false);
+      _stopPingTimer();
     }
+  }
+  
+  /// Start automatische ping timer (elke 10 seconden)
+  void _startPingTimer() {
+    _stopPingTimer(); // Stop oude timer indien actief
+    
+    _pingTimer = Timer.periodic(Duration(seconds: 10), (timer) async {
+      // Dubbelcheck of we nog echt verbonden zijn
+      if (!_isConnected) {
+        _log('⏱️ Timer gestopt - niet meer verbonden');
+        _stopPingTimer();
+        return;
+      }
+      
+      // Probeer ping te sturen
+      await sendPing();
+    });
+    
+    _log('⏱️ Automatische ping gestart (elke 10s)');
+  }
+  
+  /// Stop automatische ping timer
+  void _stopPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+  }
+  
+  /// Start connection timeout checker
+  void _resetConnectionTimeout() {
+    _stopConnectionTimeout();
+    
+    _connectionTimeoutTimer = Timer(_connectionTimeout, () {
+      if (_isConnected) {
+        final timeSinceLastData = DateTime.now().difference(_lastDataReceived ?? DateTime.now());
+        
+        if (timeSinceLastData >= _connectionTimeout) {
+          _log('⚠️ Connectie timeout - geen data ontvangen in ${_connectionTimeout.inSeconds}s');
+          _handleConnectionLost();
+        }
+      }
+    });
+  }
+  
+  /// Stop connection timeout timer
+  void _stopConnectionTimeout() {
+    _connectionTimeoutTimer?.cancel();
+    _connectionTimeoutTimer = null;
+  }
+  
+  /// Handle verloren verbinding
+  void _handleConnectionLost() {
+    _log('❌ Verbinding verloren - host reageert niet meer');
+    _isConnected = false;
+    _connectionController.add(false);
+    _stopPingTimer();
+    _stopConnectionTimeout();
   }
   
   /// Stuur een custom message naar de host
@@ -204,15 +274,25 @@ class BluetoothClient {
       final jsonString = message.toJson();
       final bytes = jsonString.codeUnits;
       
-      await _channel.invokeMethod('sendDataToHost', {
+      final bool success = await _channel.invokeMethod('sendDataToHost', {
         'data': Uint8List.fromList(bytes),
       });
       
-      _log('📤 ${type.name} verzonden naar host');
+      if (success) {
+        _log('📤 ${type.name} verzonden naar host');
+      } else {
+        _log('❌ ${type.name} verzenden mislukt - mogelijk niet verbonden');
+        _isConnected = false;
+        _connectionController.add(false);
+        _stopPingTimer();
+      }
       
     } catch (e) {
       _log('❌ Fout bij verzenden: $e');
-      rethrow;
+      _isConnected = false;
+      _connectionController.add(false);
+      _stopPingTimer();
+      _stopConnectionTimeout();
     }
   }
   
@@ -221,12 +301,16 @@ class BluetoothClient {
     try {
       _log('🛑 Stopping Client Service...');
       
+      _stopPingTimer();
+      _stopConnectionTimeout();
+      
       // Stop de Foreground Service
       await _channel.invokeMethod('stopClientService');
       
       _isConnected = false;
       _isScanning = false;
       _connectedHostName = null;
+      _lastDataReceived = null;
       _connectionController.add(false);
       _log('✅ Client Service gestopt');
       
@@ -237,10 +321,11 @@ class BluetoothClient {
   }
   
   void dispose() {
+    _stopPingTimer();
+    _stopConnectionTimeout();
     _messageController.close();
     _connectionController.close();
     _gameMessageController.close();
-    _pingController.close();
     _lastSyncController.close();
   }
 }

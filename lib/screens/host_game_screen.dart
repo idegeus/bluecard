@@ -1,30 +1,34 @@
 import 'package:flutter/material.dart';
-import '../services/bluetooth_client.dart';
+import '../services/bluetooth_host.dart';
 
-class ClientGameScreen extends StatefulWidget {
-  final BluetoothClient bluetoothClient;
+class HostGameScreen extends StatefulWidget {
+  final BluetoothHost bluetoothHost;
   
-  const ClientGameScreen({
+  const HostGameScreen({
     Key? key,
-    required this.bluetoothClient,
+    required this.bluetoothHost,
   }) : super(key: key);
 
   @override
-  State<ClientGameScreen> createState() => _ClientGameScreenState();
+  State<HostGameScreen> createState() => _HostGameScreenState();
 }
 
-class _ClientGameScreenState extends State<ClientGameScreen> {
+class _HostGameScreenState extends State<HostGameScreen> {
   final List<String> _messages = [];
+  int _playerCount = 1; // Start met host
+  DateTime? _lastSync;
   
   @override
   void initState() {
     super.initState();
+    _playerCount = widget.bluetoothHost.totalPlayerCount;
+    _lastSync = widget.bluetoothHost.lastSyncTime;
     _setupListeners();
   }
   
   void _setupListeners() {
     // Luister naar berichten
-    widget.bluetoothClient.messageStream.listen((message) {
+    widget.bluetoothHost.messageStream.listen((message) {
       if (mounted) {
         setState(() {
           _messages.insert(0, message);
@@ -34,14 +38,89 @@ class _ClientGameScreenState extends State<ClientGameScreen> {
         });
       }
     });
+    
+    // Luister naar client count updates
+    widget.bluetoothHost.clientCountStream.listen((count) {
+      if (mounted) {
+        setState(() {
+          _playerCount = count + 1; // +1 voor host
+        });
+      }
+    });
+    
+    // Luister naar laatste sync updates
+    widget.bluetoothHost.lastSyncStream.listen((time) {
+      if (mounted) {
+        setState(() {
+          _lastSync = time;
+        });
+      }
+    });
   }
   
   Future<void> _sendPing() async {
     try {
-      await widget.bluetoothClient.sendPing();
+      await widget.bluetoothHost.sendPing();
     } catch (e) {
       _showError('Fout bij verzenden ping: $e');
     }
+  }
+  
+  void _showConnectionInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[850],
+        title: Text('Spelverbinding', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInfoRow(Icons.people, 'Spelers', '$_playerCount (inclusief host)'),
+            SizedBox(height: 12),
+            _buildInfoRow(Icons.wifi, 'Status', 'Verbonden'),
+            SizedBox(height: 12),
+            _buildInfoRow(
+              Icons.sync,
+              'Laatste sync',
+              _lastSync != null 
+                ? '${_lastSync!.hour.toString().padLeft(2, '0')}:${_lastSync!.minute.toString().padLeft(2, '0')}:${_lastSync!.second.toString().padLeft(2, '0')}'
+                : 'Nog niet gesynchroniseerd',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Sluiten', style: TextStyle(color: Colors.blue)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.blue, size: 20),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              ),
+              Text(
+                value,
+                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
   
   void _showError(String message) {
@@ -58,17 +137,16 @@ class _ClientGameScreenState extends State<ClientGameScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[900],
       appBar: AppBar(
-        title: Text('Game - Client'),
+        title: Text('Game - Host'),
         backgroundColor: Colors.grey[850],
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () async {
-            await widget.bluetoothClient.disconnect();
-            if (mounted) {
-              Navigator.pop(context);
-            }
-          },
-        ),
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.info_outline),
+            tooltip: 'Verbindingsinfo',
+            onPressed: _showConnectionInfo,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -104,7 +182,7 @@ class _ClientGameScreenState extends State<ClientGameScreen> {
                           ),
                           SizedBox(height: 4),
                           Text(
-                            'Verbonden als: ${widget.bluetoothClient.playerId}',
+                            'Als: ${widget.bluetoothHost.playerId} | $_playerCount spelers',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[400],
