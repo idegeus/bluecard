@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import '../models/game_message.dart';
@@ -70,20 +69,16 @@ class BluetoothClient {
         final Uint8List data = call.arguments['data'];
         final message = String.fromCharCodes(data);
         
-        // Probeer te parsen als GameMessage
+        // Alle berichten zijn nu GameMessages
         try {
-          final Map<String, dynamic> jsonData = jsonDecode(message);
+          final gameMessage = GameMessage.fromJson(message);
+          _gameMessageController.add(gameMessage);
           
-          // Check of het een geldig GameMessage is
-          if (jsonData.containsKey('type') && 
-              jsonData.containsKey('timestamp') && 
-              jsonData.containsKey('playerId')) {
-            
-            final gameMessage = GameMessage.fromJson(message);
-            _gameMessageController.add(gameMessage);
-            
-            // Handle specifieke message types
-            if (gameMessage.type == GameMessageType.ping) {
+          _log('📨 Ontvangen ${gameMessage.type.name} van host');
+          
+          // Handle specifieke message types
+          switch (gameMessage.type) {
+            case GameMessageType.ping:
               final pingInfo = PingInfo(
                 timestamp: gameMessage.timestamp,
                 playerId: gameMessage.playerId,
@@ -95,14 +90,20 @@ class BluetoothClient {
               if (!_lastSyncController.isClosed) {
                 _lastSyncController.add(DateTime.now());
               }
-            }
-          } else {
-            // Niet een GameMessage, maar wel geldige JSON
-            _log('📩 Ontvangen custom bericht: type=${jsonData['type']}');
+              break;
+              
+            case GameMessageType.startGame:
+              _log('🎮 Game gestart door host!');
+              break;
+          }
+          
+          // Log content als het bestaat
+          if (gameMessage.content != null && gameMessage.content!.isNotEmpty) {
+            _log('📦 Content: ${gameMessage.content}');
           }
         } catch (e) {
-          // Geen JSON of parse error
-          _log('📨 Ontvangen tekst: $message');
+          _log('❌ Fout bij parsen bericht: $e');
+          _log('📨 Raw bericht: $message');
         }
         break;
         
@@ -182,22 +183,32 @@ class BluetoothClient {
     }
   }
   
-  /// Stuur actie naar de host via de Service
-  Future<void> sendActionToHost(Map<String, dynamic> action) async {
+  /// Stuur een custom message naar de host
+  Future<void> sendMessage({
+    required GameMessageType type,
+    Map<String, dynamic>? content,
+  }) async {
     if (!_isConnected) {
       _log('⚠️ Niet verbonden met host');
       return;
     }
     
     try {
-      String jsonString = jsonEncode(action);  // Gebruik jsonEncode voor correcte JSON
-      List<int> bytes = jsonString.codeUnits;
+      final message = GameMessage(
+        type: type,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        playerId: _playerId,
+        content: content,
+      );
+      
+      final jsonString = message.toJson();
+      final bytes = jsonString.codeUnits;
       
       await _channel.invokeMethod('sendDataToHost', {
         'data': Uint8List.fromList(bytes),
       });
       
-      _log('📤 Actie verzonden naar host: ${action['type']}');
+      _log('📤 ${type.name} verzonden naar host');
       
     } catch (e) {
       _log('❌ Fout bij verzenden: $e');

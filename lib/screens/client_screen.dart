@@ -129,11 +129,13 @@ class _ClientScreenState extends State<ClientScreen> {
   }
   
   Future<void> _sendTestAction() async {
-    await _bluetoothClient.sendActionToHost({
-      'type': 'test',
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-      'message': 'Test actie van client!',
-    });
+    await _bluetoothClient.sendMessage(
+      type: GameMessageType.ping,
+      content: {
+        'message': 'Test actie van client!',
+        'extra': 'Extra informatie',
+      },
+    );
   }
   
   void _showNotification(String message) {

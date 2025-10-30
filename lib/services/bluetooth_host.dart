@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/game_message.dart';
@@ -93,33 +92,27 @@ class BluetoothHost {
     _log('👥 Totaal clients: ${_connectedClients.length}');
   }
   
-  /// Data ontvangen callback - parse als GameMessage indien mogelijk
+  /// Data ontvangen callback - alle berichten zijn GameMessages
   void _onDataReceived(String address, Uint8List data) {
     final String message = String.fromCharCodes(data);
-    _log('📨 Data ontvangen van $address: $message');
     
     try {
-      // Probeer te parsen als JSON
-      final Map<String, dynamic> jsonData = jsonDecode(message);
+      // Parse als GameMessage
+      final gameMessage = GameMessage.fromJson(message);
       
-      // Check of het een geldig GameMessage is (heeft type, timestamp, playerId)
-      if (jsonData.containsKey('type') && 
-          jsonData.containsKey('timestamp') && 
-          jsonData.containsKey('playerId')) {
-        
-        // Parse als GameMessage
-        final gameMessage = GameMessage.fromJson(message);
-        
-        // Broadcast naar alle clients inclusief host zelf
-        _broadcastGameMessage(gameMessage);
-        
-      } else {
-        // Niet een GameMessage, maar wel geldige JSON
-        _log('📩 Ontvangen custom bericht: type=${jsonData['type']}, message=${jsonData['message']}');
+      _log('📨 Ontvangen ${gameMessage.type.name} van ${gameMessage.playerId} ($address)');
+      
+      // Log content als het bestaat
+      if (gameMessage.content != null && gameMessage.content!.isNotEmpty) {
+        _log('📦 Content: ${gameMessage.content}');
       }
       
+      // Broadcast naar alle clients inclusief host zelf
+      _broadcastGameMessage(gameMessage);
+      
     } catch (e) {
-      _log('⚠️ Kon bericht niet parsen: $e');
+      _log('❌ Fout bij parsen bericht: $e');
+      _log('📨 Raw bericht: $message');
     }
   }
   
@@ -247,6 +240,24 @@ class BluetoothHost {
     
     // Broadcast ook naar host zelf
     _broadcastGameMessage(pingMessage);
+  }
+  
+  /// Stuur een custom message naar alle clients
+  Future<void> sendMessage({
+    required GameMessageType type,
+    Map<String, dynamic>? content,
+  }) async {
+    final message = GameMessage(
+      type: type,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      playerId: _playerId,
+      content: content,
+    );
+    
+    await _sendGameMessage(message);
+    
+    // Broadcast ook naar host zelf
+    _broadcastGameMessage(message);
   }
   
   /// Stuur GameMessage naar alle clients
