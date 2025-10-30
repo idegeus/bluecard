@@ -192,6 +192,7 @@ class BluetoothHost {
       _currentHostName = null;
       _connectedClients.clear();
       _clientCountController.add(0);
+      _playerIdsController.add(['host']); // Reset naar alleen host
       _log('✅ Host Service gestopt');
       
     } catch (e) {
