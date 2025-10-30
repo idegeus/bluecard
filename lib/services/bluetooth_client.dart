@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import '../models/game_message.dart';
 
 /// BluetoothClient - Verbindt met de GATT server van de host
 /// Beheert de verbinding, luistert naar notificaties, en stuurt acties
@@ -14,15 +15,25 @@ class BluetoothClient {
   
   final StreamController<String> _messageController = StreamController.broadcast();
   final StreamController<bool> _connectionController = StreamController.broadcast();
+  final StreamController<GameMessage> _gameMessageController = StreamController.broadcast();
+  final StreamController<PingInfo> _pingController = StreamController.broadcast();
   
   bool _isConnected = false;
   bool _isScanning = false;
+  String _playerId = 'client';
   
   Stream<String> get messageStream => _messageController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
+  Stream<GameMessage> get gameMessageStream => _gameMessageController.stream;
+  Stream<PingInfo> get pingStream => _pingController.stream;
   bool get isConnected => _isConnected;
   bool get isScanning => _isScanning;
   BluetoothDevice? get hostDevice => _hostDevice;
+  String get playerId => _playerId;
+  
+  void setPlayerId(String id) {
+    _playerId = id;
+  }
   
   /// Start met zoeken naar de host
   Future<void> searchForHost() async {
@@ -49,26 +60,18 @@ class BluetoothClient {
       // Start scanning - luister naar ALLE onScanResults
       _scanSubscription = FlutterBluePlus.scanResults.listen(
         (results) {
-          _messageController.add('📊 Scan batch ontvangen: ${results.length} devices');
-          
           for (var result in results) {
             deviceCount++;
             final deviceName = result.device.platformName;
-            final deviceId = result.device.remoteId.toString();
-            final rssi = result.rssi;
-            final serviceUuids = result.advertisementData.serviceUuids.map((u) => u.toString()).toList();
             final isBlueCardHost = deviceName.isNotEmpty && deviceName.contains('BlueCard');
             
-            // Log ALLE devices voor debugging
-            _messageController.add('📱 #$deviceCount: ${deviceName.isEmpty ? "Unnamed" : deviceName}');
-            _messageController.add('   ID: $deviceId | RSSI: $rssi dBm');
-            if (serviceUuids.isNotEmpty) {
-              _messageController.add('   Services: ${serviceUuids.join(", ")}');
-            }
-            
-            // Check of dit een BlueCard host is
+            // Log alleen BlueCard hosts
             if (isBlueCardHost) {
+              final deviceId = result.device.remoteId.toString();
+              final rssi = result.rssi;
+              
               _messageController.add('✅ BlueCard host gevonden: $deviceName');
+              _messageController.add('   ID: $deviceId | RSSI: $rssi dBm');
               _messageController.add('🔗 Automatisch verbinden...');
               FlutterBluePlus.stopScan();
               _connectToHost(result.device);
@@ -198,6 +201,24 @@ class BluetoothClient {
       _notificationSubscription = char.onValueReceived.listen((value) {
         String message = String.fromCharCodes(value);
         _messageController.add('📨 Notificatie van host: $message');
+        
+        // Parse als GameMessage
+        try {
+          final gameMessage = GameMessage.fromJson(message);
+          _gameMessageController.add(gameMessage);
+          
+          // Als het een ping is, voeg toe aan ping stream
+          if (gameMessage.type == GameMessageType.ping) {
+            _pingController.add(PingInfo(
+              timestamp: gameMessage.timestamp,
+              playerId: gameMessage.playerId,
+              receivedAt: DateTime.now(),
+            ));
+          }
+          
+        } catch (e) {
+          _messageController.add('⚠️ Kon message niet parsen als JSON: $e');
+        }
       });
       
       _messageController.add('🔔 Notificaties ingeschakeld');
@@ -237,6 +258,33 @@ class BluetoothClient {
       // Probeer nogmaals na 5 seconden
       await Future.delayed(Duration(seconds: 5));
       _attemptReconnect();
+    }
+  }
+  
+  /// Stuur een ping naar de host
+  Future<void> sendPing() async {
+    if (!_isConnected || _characteristic == null) {
+      _messageController.add('⚠️ Niet verbonden met host');
+      return;
+    }
+    
+    try {
+      final pingMessage = GameMessage(
+        type: GameMessageType.ping,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        playerId: _playerId,
+      );
+      
+      final jsonString = pingMessage.toJson();
+      final bytes = jsonString.codeUnits;
+      
+      await _characteristic!.write(bytes, withoutResponse: false);
+      
+      _messageController.add('📤 Ping verzonden naar host');
+      
+    } catch (e) {
+      _messageController.add('❌ Fout bij verzenden ping: $e');
+      rethrow;
     }
   }
   
@@ -286,5 +334,7 @@ class BluetoothClient {
     _notificationSubscription?.cancel();
     _messageController.close();
     _connectionController.close();
+    _gameMessageController.close();
+    _pingController.close();
   }
 }

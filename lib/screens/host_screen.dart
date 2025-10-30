@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/bluetooth_host.dart';
 import '../services/game_service.dart';
+import '../models/game_message.dart';
 
 class HostScreen extends StatefulWidget {
   const HostScreen({Key? key}) : super(key: key);
@@ -14,6 +15,7 @@ class _HostScreenState extends State<HostScreen> {
   final GameService _gameService = GameService();
   
   final List<String> _messages = [];
+  final List<PingInfo> _pings = [];
   bool _isServerStarted = false;
   int _clientCount = 0;
   
@@ -40,6 +42,24 @@ class _HostScreenState extends State<HostScreen> {
       setState(() {
         _clientCount = count;
       });
+    });
+    
+    // Luister naar ping updates
+    _bluetoothHost.pingStream.listen((pingInfo) {
+      setState(() {
+        _pings.insert(0, pingInfo);
+        if (_pings.length > 20) {
+          _pings.removeLast();
+        }
+      });
+    });
+    
+    // Luister naar game messages voor navigatie
+    _bluetoothHost.gameMessageStream.listen((gameMessage) {
+      if (gameMessage.type == GameMessageType.startGame) {
+        // Host blijft op deze screen, maar game is nu gestart
+        setState(() {});
+      }
     });
     
     // Luister naar game events
@@ -78,10 +98,20 @@ class _HostScreenState extends State<HostScreen> {
     });
   }
   
-  Future<void> _sendTestNotification() async {
-    await _bluetoothHost.sendNotificationToClients(
-      '🧪 Test melding van host! Tijd: ${DateTime.now().toString().substring(11, 19)}'
-    );
+  Future<void> _startGame() async {
+    try {
+      await _bluetoothHost.startGame();
+    } catch (e) {
+      _showError('Fout bij starten game: $e');
+    }
+  }
+  
+  Future<void> _sendPing() async {
+    try {
+      await _bluetoothHost.sendPing();
+    } catch (e) {
+      _showError('Fout bij verzenden ping: $e');
+    }
   }
   
   void _showError(String message) {
@@ -193,9 +223,21 @@ class _HostScreenState extends State<HostScreen> {
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _sendTestNotification,
-                          icon: Icon(Icons.notifications),
-                          label: Text('Test Melding'),
+                          onPressed: _bluetoothHost.gameStarted ? null : _startGame,
+                          icon: Icon(Icons.play_arrow),
+                          label: Text('Start Game'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _sendPing,
+                          icon: Icon(Icons.wifi_tethering),
+                          label: Text('Ping'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
                             padding: EdgeInsets.symmetric(vertical: 16),
@@ -218,6 +260,64 @@ class _HostScreenState extends State<HostScreen> {
               ],
             ),
           ),
+          
+          // Ping overzicht
+          if (_pings.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.wifi_tethering, color: Colors.grey[600], size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Ping Overzicht',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[400],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  Container(
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[850],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListView.builder(
+                      itemCount: _pings.length,
+                      itemBuilder: (context, index) {
+                        final ping = _pings[index];
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(Icons.person, color: Colors.blue, size: 16),
+                          title: Text(
+                            'Player: ${ping.playerId}',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                          subtitle: Text(
+                            'Timestamp: ${ping.timestamp}',
+                            style: TextStyle(color: Colors.grey[500], fontSize: 10),
+                          ),
+                          trailing: Text(
+                            DateTime.fromMillisecondsSinceEpoch(ping.timestamp)
+                                .toString()
+                                .substring(11, 19),
+                            style: TextStyle(color: Colors.grey[400], fontSize: 10),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           
           // Berichten log
           Padding(

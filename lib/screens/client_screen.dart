@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/bluetooth_client.dart';
+import '../models/game_message.dart';
+import 'client_game_screen.dart';
 
 class ClientScreen extends StatefulWidget {
   const ClientScreen({Key? key}) : super(key: key);
@@ -26,12 +28,14 @@ class _ClientScreenState extends State<ClientScreen> {
   void _setupListeners() {
     // Luister naar berichten
     _bluetoothClient.messageStream.listen((message) {
-      setState(() {
-        _messages.insert(0, message);
-        if (_messages.length > 50) {
-          _messages.removeLast();
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _messages.insert(0, message);
+          if (_messages.length > 50) {
+            _messages.removeLast();
+          }
+        });
+      }
       
       // Toon notificatie bij ontvangen berichten van host
       if (message.contains('📨 Notificatie van host:')) {
@@ -41,14 +45,31 @@ class _ClientScreenState extends State<ClientScreen> {
     
     // Luister naar verbindingsstatus
     _bluetoothClient.connectionStream.listen((connected) {
-      setState(() {
-        _isConnected = connected;
-        if (connected && _bluetoothClient.hostDevice != null) {
-          _hostName = _bluetoothClient.hostDevice!.platformName;
-        } else {
-          _hostName = null;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _isConnected = connected;
+          if (connected && _bluetoothClient.hostDevice != null) {
+            _hostName = _bluetoothClient.hostDevice!.platformName;
+          } else {
+            _hostName = null;
+          }
+        });
+      }
+    });
+    
+    // Luister naar game messages voor auto-navigatie
+    _bluetoothClient.gameMessageStream.listen((gameMessage) {
+      if (gameMessage.type == GameMessageType.startGame && mounted) {
+        // Navigeer naar game screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ClientGameScreen(
+              bluetoothClient: _bluetoothClient,
+            ),
+          ),
+        );
+      }
     });
   }
   
