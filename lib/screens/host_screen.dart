@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/bluetooth_host.dart';
 import '../services/game_service.dart';
+import '../services/game_engine.dart';
 import '../models/game_message.dart';
+import '../models/game_type.dart';
 import '../widgets/player_list.dart';
 import '../widgets/message_log.dart';
 import 'game_screen.dart';
@@ -17,9 +19,12 @@ class HostScreen extends StatefulWidget {
 class _HostScreenState extends State<HostScreen> {
   final BluetoothHost _bluetoothHost = BluetoothHost();
   final GameService _gameService = GameService();
+  final GameEngine _gameEngine = GameEngine();
   
   final List<String> _messages = [];
   bool _isServerStarted = false;
+  GameType? _selectedGameType;
+  bool _hasShownSoloWarning = false;
   
   // Stream subscriptions om te kunnen cancellen
   late final List<StreamSubscription> _subscriptions;
@@ -116,10 +121,170 @@ class _HostScreenState extends State<HostScreen> {
   }
   
   Future<void> _startGame() async {
+    // Check of een spel is geselecteerd
+    if (_selectedGameType == null) {
+      _showGameTypeSelector();
+      return;
+    }
+    
+    // Check of de host alleen is en nog geen warning heeft gezien
+    if (_bluetoothHost.totalPlayerCount == 1 && !_hasShownSoloWarning) {
+      _hasShownSoloWarning = true;
+      _showSoloWarning();
+      return;
+    }
+    
     try {
+      // Initialiseer game engine met geselecteerd speltype
+      _gameEngine.selectGame(_selectedGameType!, _bluetoothHost.playerIds);
+      
+      // Stuur startGame message (zal navigatie triggeren via listener)
       await _bluetoothHost.startGame();
     } catch (e) {
       _showError('Fout bij starten game: $e');
+    }
+  }
+  
+  void _showSoloWarning() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[850],
+        title: Row(
+          children: [
+            Icon(Icons.person, color: Colors.orange, size: 28),
+            SizedBox(width: 12),
+            Text(
+              'Je bent alleen!',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+          ],
+        ),
+        content: Text(
+          'Wacht op meer spelers, of druk nog een keer op Start om solo te spelen.',
+          style: TextStyle(color: Colors.grey[300], fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK', style: TextStyle(color: Colors.green)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showGameTypeSelector() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[850],
+        title: Text(
+          'Kies een spel',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: GameType.values.map((gameType) {
+              // Check of aantal spelers binnen range is
+              final rules = _createRulesForInfo(gameType);
+              final playerCount = _bluetoothHost.totalPlayerCount;
+              final isValid = playerCount >= rules.minPlayers && 
+                             playerCount <= rules.maxPlayers;
+              
+              return Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: isValid ? () {
+                    setState(() {
+                      _selectedGameType = gameType;
+                    });
+                    Navigator.pop(context);
+                    _startGame();
+                  } : null,
+                  child: Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isValid ? Colors.grey[800] : Colors.grey[900],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isValid ? Colors.green : Colors.grey[700]!,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          gameType.emoji,
+                          style: TextStyle(fontSize: 24),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                gameType.displayName,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: isValid ? Colors.white : Colors.grey,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                gameType.description,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                '${rules.minPlayers}-${rules.maxPlayers} spelers',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: isValid ? Colors.green : Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!isValid)
+                          Icon(Icons.lock, color: Colors.grey, size: 18),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Annuleren', style: TextStyle(fontSize: 14)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  GameRules _createRulesForInfo(GameType gameType) {
+    switch (gameType) {
+      case GameType.freePlay:
+        return FreePlayRules();
+      case GameType.president:
+        return PresidentRules();
+      case GameType.hearts:
+        return HeartsRules();
+      case GameType.uno:
+        return UnoRules();
+      case GameType.pesten:
+        return PestenRules();
     }
   }
   
@@ -228,13 +393,65 @@ class _HostScreenState extends State<HostScreen> {
                 
                 if (_isServerStarted) ...[
                   SizedBox(height: 20),
+                  
+                  // Toon geselecteerd spel
+                  if (_selectedGameType != null) ...[
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            _selectedGameType!.emoji,
+                            style: TextStyle(fontSize: 24),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Geselecteerd: ${_selectedGameType!.displayName}',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  _selectedGameType!.description,
+                                  style: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close, color: Colors.white),
+                            onPressed: _bluetoothHost.gameStarted ? null : () {
+                              setState(() {
+                                _selectedGameType = null;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                  ],
+                  
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: _bluetoothHost.gameStarted ? null : _startGame,
                           icon: Icon(Icons.play_arrow),
-                          label: Text('Start Game'),
+                          label: Text(_selectedGameType == null ? 'Kies Spel' : 'Start Game'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                             padding: EdgeInsets.symmetric(vertical: 16),

@@ -218,7 +218,7 @@ class BluetoothHost {
   Future<void> sendNotificationToClients(String message) async {
     try {
       if (_connectedClients.isEmpty) {
-        _log('⚠️ Geen clients verbonden');
+        // Stuur niet als er geen clients zijn (solo spel is toegestaan)
         return;
       }
       
@@ -244,13 +244,8 @@ class BluetoothHost {
       return;
     }
     
-    if (_connectedClients.isEmpty) {
-      _log('⚠️ Geen clients verbonden');
-      return;
-    }
-    
     _gameStarted = true;
-    _log('🎮 Game gestart! Geen nieuwe spelers meer toegestaan');
+    _log('🎮 Game gestart!');
     
     // Roep de native methode aan
     await _channel.invokeMethod('startGame');
