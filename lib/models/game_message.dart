@@ -6,6 +6,11 @@ enum GameMessageType {
   ping,
   playerJoined,
   goodbye,
+  // Pesten game messages
+  gameState,      // Volledige game state sync
+  cardPlayed,     // Speler speelt een kaart
+  cardDrawn,      // Speler pakt kaart(en)
+  suitChosen,     // Speler kiest kleur (na joker)
 }
 
 /// Game message voor communicatie tussen host en clients

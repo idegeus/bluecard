@@ -56,10 +56,14 @@ class BluetoothHost {
   
   /// Handle callbacks van de native GATT server
   Future<dynamic> _handleNativeCallback(MethodCall call) async {
+    print('🔔 [DEBUG] _handleNativeCallback called: ${call.method}');
+    print('🔔 [DEBUG] Arguments: ${call.arguments}');
+    
     switch (call.method) {
       case 'onClientConnected':
         final String name = call.arguments['name'] ?? 'Unknown';
         final String address = call.arguments['address'] ?? '';
+        print('🔔 [DEBUG] Calling _onClientConnected($name, $address)');
         _onClientConnected(name, address);
         break;
         
@@ -79,6 +83,10 @@ class BluetoothHost {
   
   /// Client verbonden callback
   void _onClientConnected(String name, String address) {
+    print('📱 [DEBUG] _onClientConnected called: $name ($address)');
+    print('📱 [DEBUG] _gameStarted: $_gameStarted');
+    print('📱 [DEBUG] Current _connectedClients: $_connectedClients');
+    
     if (_gameStarted) {
       _log('⛔ Game al gestart, client $name geweigerd');
       return;
@@ -239,6 +247,12 @@ class BluetoothHost {
   
   /// Start het spel - geen nieuwe clients meer toegestaan
   Future<void> startGame() async {
+    print('🎮 [DEBUG] startGame() called');
+    print('🎮 [DEBUG] _gameStarted: $_gameStarted');
+    print('🎮 [DEBUG] _connectedClients.length: ${_connectedClients.length}');
+    print('🎮 [DEBUG] _connectedClients: $_connectedClients');
+    print('🎮 [DEBUG] playerIds: $playerIds');
+    
     if (_gameStarted) {
       _log('⚠️ Game is al gestart');
       return;
@@ -246,6 +260,8 @@ class BluetoothHost {
     
     if (_connectedClients.isEmpty) {
       _log('⚠️ Geen clients verbonden');
+      _log('⚠️ Connected clients list: $_connectedClients');
+      _log('⚠️ Player IDs: $playerIds');
       return;
     }
     
@@ -373,15 +389,27 @@ class BluetoothHost {
     _broadcastGameMessage(message);
   }
   
+  /// Broadcast een GameMessage naar alle clients (convenience method)
+  Future<void> broadcastMessage(GameMessage message) async {
+    print('📡 [BluetoothHost] broadcastMessage: ${message.type}');
+    await _sendGameMessage(message);
+    _broadcastGameMessage(message);
+    print('📡 [BluetoothHost] broadcastMessage complete');
+  }
+  
   /// Stuur GameMessage naar alle clients
   Future<void> _sendGameMessage(GameMessage message) async {
     try {
       final jsonString = message.toJson();
       final data = jsonString.codeUnits;
       
+      print('📤 [BluetoothHost] Sending ${message.type} (${data.length} bytes) to ${_connectedClients.length} clients');
+      
       await _channel.invokeMethod('sendData', {
         'data': Uint8List.fromList(data),
       });
+      
+      print('✅ [BluetoothHost] Message sent successfully');
       
     } catch (e) {
       _log('❌ Fout bij verzenden game message: $e');

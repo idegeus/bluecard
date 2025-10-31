@@ -89,6 +89,10 @@ class BluetoothClient {
         // Alle berichten zijn nu GameMessages
         try {
           final gameMessage = GameMessage.fromJson(message);
+          
+          print('📨 [BluetoothClient] Parsed GameMessage: ${gameMessage.type}');
+          print('📨 [BluetoothClient] Adding to gameMessageController (hasListener: ${_gameMessageController.hasListener})');
+          
           _gameMessageController.add(gameMessage);
           
           _log('📨 Ontvangen ${gameMessage.type.name} van host');
@@ -119,6 +123,14 @@ class BluetoothClient {
               
             case GameMessageType.goodbye:
               _log('👋 Host heeft game afgesloten');
+              break;
+              
+            // Pesten game messages - handled by PestenGameClient
+            case GameMessageType.gameState:
+            case GameMessageType.cardPlayed:
+            case GameMessageType.cardDrawn:
+            case GameMessageType.suitChosen:
+              // Deze worden afgehandeld in PestenGameClient via gameMessageStream
               break;
           }
           

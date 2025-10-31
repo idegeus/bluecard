@@ -232,9 +232,13 @@ class _HostScreenState extends State<HostScreen> {
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _bluetoothHost.gameStarted ? null : _startGame,
+                          onPressed: (_bluetoothHost.gameStarted || _bluetoothHost.connectedClientCount == 0) 
+                              ? null 
+                              : _startGame,
                           icon: Icon(Icons.play_arrow),
-                          label: Text('Start Game'),
+                          label: Text(_bluetoothHost.connectedClientCount == 0 
+                              ? 'Wacht op spelers...' 
+                              : 'Start Game'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                             padding: EdgeInsets.symmetric(vertical: 16),

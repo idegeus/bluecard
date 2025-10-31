@@ -72,10 +72,15 @@ class _ClientScreenState extends State<ClientScreen> {
     
     // Luister naar game messages voor auto-navigatie
     _subscriptions.add(_bluetoothClient.gameMessageStream.listen((gameMessage) {
-      if (!mounted) return;
+      print('🎮 [ClientScreen] Received game message: ${gameMessage.type}');
+      if (!mounted) {
+        print('⚠️ [ClientScreen] Widget not mounted, ignoring message');
+        return;
+      }
       
       switch (gameMessage.type) {
         case GameMessageType.startGame:
+          print('🎮 [ClientScreen] StartGame received! Navigating to GameScreen...');
           // Navigeer naar gedeelde game screen
           Navigator.pushReplacement(
             context,
@@ -89,11 +94,13 @@ class _ClientScreenState extends State<ClientScreen> {
           break;
           
         case GameMessageType.playerJoined:
+          print('🎮 [ClientScreen] PlayerJoined received');
           // Trigger rebuild voor player lijst update
           setState(() {});
           break;
           
         default:
+          print('🎮 [ClientScreen] Other message type: ${gameMessage.type}');
           break;
       }
     }));
