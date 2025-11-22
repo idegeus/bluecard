@@ -7,7 +7,7 @@ import '../widgets/message_log.dart';
 import 'game_screen.dart';
 
 class ClientScreen extends StatefulWidget {
-  const ClientScreen({Key? key}) : super(key: key);
+  const ClientScreen({super.key});
 
   @override
   State<ClientScreen> createState() => _ClientScreenState();
@@ -15,100 +15,106 @@ class ClientScreen extends StatefulWidget {
 
 class _ClientScreenState extends State<ClientScreen> {
   final BluetoothClient _bluetoothClient = BluetoothClient();
-  
+
   final List<String> _messages = [];
   bool _isConnected = false;
   bool _isSearching = false;
   String? _hostName;
-  
+
   // Stream subscriptions om te kunnen cancellen
   late final List<StreamSubscription> _subscriptions;
-  
+
   @override
   void initState() {
     super.initState();
     _subscriptions = [];
     _setupListeners();
     _requestPermissions();
-    
+
     // Automatisch beginnen met zoeken naar hosts zodra screen geladen is
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchAndConnect();
     });
   }
-  
+
   void _setupListeners() {
     // Luister naar berichten
-    _subscriptions.add(_bluetoothClient.messageStream.listen((message) {
-      if (mounted) {
-        setState(() {
-          _messages.insert(0, message);
-          if (_messages.length > 50) {
-            _messages.removeLast();
-          }
-        });
-      }
-      
-      // Toon notificatie bij ontvangen berichten van host
-      if (message.contains('📨 Notificatie van host:')) {
-        _showNotification(message.substring(message.indexOf(':') + 2));
-      }
-    }));
-    
+    _subscriptions.add(
+      _bluetoothClient.messageStream.listen((message) {
+        if (mounted) {
+          setState(() {
+            _messages.insert(0, message);
+            if (_messages.length > 50) {
+              _messages.removeLast();
+            }
+          });
+        }
+
+        // Toon notificatie bij ontvangen berichten van host
+        if (message.contains('📨 Notificatie van host:')) {
+          _showNotification(message.substring(message.indexOf(':') + 2));
+        }
+      }),
+    );
+
     // Luister naar verbindingsstatus
-    _subscriptions.add(_bluetoothClient.connectionStream.listen((connected) {
-      if (mounted) {
-        setState(() {
-          _isConnected = connected;
-          if (connected) {
-            _hostName = _bluetoothClient.connectedHostName ?? 'BlueCard Host';
-            _isSearching = false; // Stop searching wanneer verbonden
-          } else {
-            _hostName = null;
-          }
-        });
-      }
-    }));
-    
+    _subscriptions.add(
+      _bluetoothClient.connectionStream.listen((connected) {
+        if (mounted) {
+          setState(() {
+            _isConnected = connected;
+            if (connected) {
+              _hostName = _bluetoothClient.connectedHostName ?? 'BlueCard Host';
+              _isSearching = false; // Stop searching wanneer verbonden
+            } else {
+              _hostName = null;
+            }
+          });
+        }
+      }),
+    );
+
     // Luister naar game messages voor auto-navigatie
-    _subscriptions.add(_bluetoothClient.gameMessageStream.listen((gameMessage) {
-      if (!mounted) return;
-      
-      switch (gameMessage.type) {
-        case GameMessageType.startGame:
-          // Navigeer naar gedeelde game screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => GameScreen(
-                bluetoothClient: _bluetoothClient,
-                isHost: false,
+    _subscriptions.add(
+      _bluetoothClient.gameMessageStream.listen((gameMessage) {
+        if (!mounted) return;
+
+        switch (gameMessage.type) {
+          case GameMessageType.startGame:
+            // Navigeer naar gedeelde game screen
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GameScreen(
+                  bluetoothClient: _bluetoothClient,
+                  isHost: false,
+                ),
               ),
-            ),
-          );
-          break;
-          
-        case GameMessageType.playerJoined:
-          // Trigger rebuild voor player lijst update
-          setState(() {});
-          break;
-          
-        default:
-          break;
-      }
-    }));
+            );
+            break;
+
+          case GameMessageType.playerJoined:
+            // Trigger rebuild voor player lijst update
+            setState(() {});
+            break;
+
+          default:
+            break;
+        }
+      }),
+    );
   }
-  
+
   Future<void> _requestPermissions() async {
     // Permissions worden automatisch gevraagd door de service
     // bij het starten van de ClientService
   }
-  
+
   Future<void> _searchAndConnect() async {
     setState(() {
       _isSearching = true;
     });
-    
+
     try {
       // Check eerst of we al connected zijn
       if (_isConnected) {
@@ -118,18 +124,18 @@ class _ClientScreenState extends State<ClientScreen> {
         });
         return;
       }
-      
+
       // Start de Client Foreground Service die automatisch zoekt naar hosts
       _messages.insert(0, '🔍 Starting Client Service...');
       _messages.insert(0, '💡 De service draait in de achtergrond');
       _messages.insert(0, '💡 Je ontvangt een notificatie tijdens het zoeken');
       setState(() {});
-      
+
       await _bluetoothClient.searchForHost();
-      
+
       // _isSearching blijft true tot verbinding gemaakt is of timeout
       // De connectionStream listener zet het op false bij verbinding
-      
+
       // Timeout na 30 seconden als geen verbinding
       Future.delayed(Duration(seconds: 30), () {
         if (_isSearching && !_isConnected && mounted) {
@@ -139,7 +145,6 @@ class _ClientScreenState extends State<ClientScreen> {
           _showError('Geen host gevonden. Probeer opnieuw.');
         }
       });
-      
     } catch (e) {
       _showError('Fout bij zoeken: $e');
       setState(() {
@@ -147,12 +152,12 @@ class _ClientScreenState extends State<ClientScreen> {
       });
     }
   }
-  
+
   Future<void> _disconnect() async {
     // Stop de Client Service (sluit verbinding en stopt de foreground service)
     await _bluetoothClient.disconnect();
   }
-  
+
   Future<void> _sendTestAction() async {
     await _bluetoothClient.sendMessage(
       type: GameMessageType.ping,
@@ -162,7 +167,7 @@ class _ClientScreenState extends State<ClientScreen> {
       },
     );
   }
-  
+
   void _showNotification(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -179,29 +184,26 @@ class _ClientScreenState extends State<ClientScreen> {
       ),
     );
   }
-  
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
-  
+
   @override
   void dispose() {
     // Cancel alle stream subscriptions om memory leaks te voorkomen
     for (var subscription in _subscriptions) {
       subscription.cancel();
     }
-    
+
     // NIET de service disposen - deze moet actief blijven voor andere schermen
     // De service wordt alleen gedisposed bij quitGame()
     // _bluetoothClient.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -240,7 +242,9 @@ class _ClientScreenState extends State<ClientScreen> {
                 Row(
                   children: [
                     Icon(
-                      _isConnected ? Icons.check_circle : Icons.radio_button_unchecked,
+                      _isConnected
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
                       color: _isConnected ? Colors.green : Colors.grey,
                       size: 32,
                     ),
@@ -272,9 +276,9 @@ class _ClientScreenState extends State<ClientScreen> {
                     ),
                   ],
                 ),
-                
+
                 SizedBox(height: 20),
-                
+
                 if (!_isConnected) ...[
                   SizedBox(
                     width: double.infinity,
@@ -298,7 +302,7 @@ class _ClientScreenState extends State<ClientScreen> {
                     ),
                   ),
                 ],
-                
+
                 if (_isConnected) ...[
                   Row(
                     children: [
@@ -329,7 +333,7 @@ class _ClientScreenState extends State<ClientScreen> {
               ],
             ),
           ),
-          
+
           // Spelers lijst (alleen tonen als verbonden en er spelers zijn)
           if (_isConnected && _bluetoothClient.playerIds.isNotEmpty) ...[
             PlayerList(
@@ -338,11 +342,9 @@ class _ClientScreenState extends State<ClientScreen> {
             ),
             SizedBox(height: 16),
           ],
-          
+
           // Berichten log
-          Expanded(
-            child: MessageLog(messages: _messages),
-          ),
+          Expanded(child: MessageLog(messages: _messages)),
         ],
       ),
     );

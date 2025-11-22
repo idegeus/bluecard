@@ -3,11 +3,8 @@ import '../services/bluetooth_host.dart';
 
 class HostGameScreen extends StatefulWidget {
   final BluetoothHost bluetoothHost;
-  
-  const HostGameScreen({
-    Key? key,
-    required this.bluetoothHost,
-  }) : super(key: key);
+
+  const HostGameScreen({super.key, required this.bluetoothHost});
 
   @override
   State<HostGameScreen> createState() => _HostGameScreenState();
@@ -17,7 +14,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
   final List<String> _messages = [];
   int _playerCount = 1; // Start met host
   DateTime? _lastSync;
-  
+
   @override
   void initState() {
     super.initState();
@@ -25,7 +22,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
     _lastSync = widget.bluetoothHost.lastSyncTime;
     _setupListeners();
   }
-  
+
   void _setupListeners() {
     // Luister naar berichten
     widget.bluetoothHost.messageStream.listen((message) {
@@ -38,14 +35,14 @@ class _HostGameScreenState extends State<HostGameScreen> {
         });
       }
     });
-    
+
     // Luister naar player IDs updates voor rebuild
     widget.bluetoothHost.playerIdsStream.listen((_) {
       if (mounted) {
         setState(() {});
       }
     });
-    
+
     // Luister naar laatste sync updates
     widget.bluetoothHost.lastSyncStream.listen((time) {
       if (mounted) {
@@ -55,7 +52,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
       }
     });
   }
-  
+
   Future<void> _sendPing() async {
     try {
       await widget.bluetoothHost.sendPing();
@@ -63,7 +60,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
       _showError('Fout bij verzenden ping: $e');
     }
   }
-  
+
   void _showConnectionInfo() {
     showDialog(
       context: context,
@@ -74,16 +71,20 @@ class _HostGameScreenState extends State<HostGameScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow(Icons.people, 'Spelers', '$_playerCount (inclusief host)'),
+            _buildInfoRow(
+              Icons.people,
+              'Spelers',
+              '$_playerCount (inclusief host)',
+            ),
             SizedBox(height: 12),
             _buildInfoRow(Icons.wifi, 'Status', 'Verbonden'),
             SizedBox(height: 12),
             _buildInfoRow(
               Icons.sync,
               'Laatste sync',
-              _lastSync != null 
-                ? '${_lastSync!.hour.toString().padLeft(2, '0')}:${_lastSync!.minute.toString().padLeft(2, '0')}:${_lastSync!.second.toString().padLeft(2, '0')}'
-                : 'Nog niet gesynchroniseerd',
+              _lastSync != null
+                  ? '${_lastSync!.hour.toString().padLeft(2, '0')}:${_lastSync!.minute.toString().padLeft(2, '0')}:${_lastSync!.second.toString().padLeft(2, '0')}'
+                  : 'Nog niet gesynchroniseerd',
             ),
           ],
         ),
@@ -96,7 +97,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
       ),
     );
   }
-  
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -112,7 +113,11 @@ class _HostGameScreenState extends State<HostGameScreen> {
               ),
               Text(
                 value,
-                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -120,16 +125,13 @@ class _HostGameScreenState extends State<HostGameScreen> {
       ],
     );
   }
-  
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -160,11 +162,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.videogame_asset,
-                      color: Colors.green,
-                      size: 32,
-                    ),
+                    Icon(Icons.videogame_asset, color: Colors.green, size: 32),
                     SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -207,7 +205,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
               ],
             ),
           ),
-          
+
           // Berichten log
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -226,9 +224,9 @@ class _HostGameScreenState extends State<HostGameScreen> {
               ],
             ),
           ),
-          
+
           SizedBox(height: 12),
-          
+
           // Berichten lijst
           Expanded(
             child: Container(
@@ -263,7 +261,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
                     ),
             ),
           ),
-          
+
           SizedBox(height: 16),
         ],
       ),

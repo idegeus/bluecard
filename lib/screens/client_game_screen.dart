@@ -3,11 +3,8 @@ import '../services/bluetooth_client.dart';
 
 class ClientGameScreen extends StatefulWidget {
   final BluetoothClient bluetoothClient;
-  
-  const ClientGameScreen({
-    Key? key,
-    required this.bluetoothClient,
-  }) : super(key: key);
+
+  const ClientGameScreen({super.key, required this.bluetoothClient});
 
   @override
   State<ClientGameScreen> createState() => _ClientGameScreenState();
@@ -15,13 +12,13 @@ class ClientGameScreen extends StatefulWidget {
 
 class _ClientGameScreenState extends State<ClientGameScreen> {
   final List<String> _messages = [];
-  
+
   @override
   void initState() {
     super.initState();
     _setupListeners();
   }
-  
+
   void _setupListeners() {
     // Luister naar berichten
     widget.bluetoothClient.messageStream.listen((message) {
@@ -35,7 +32,7 @@ class _ClientGameScreenState extends State<ClientGameScreen> {
       }
     });
   }
-  
+
   Future<void> _sendPing() async {
     try {
       await widget.bluetoothClient.sendPing();
@@ -43,16 +40,13 @@ class _ClientGameScreenState extends State<ClientGameScreen> {
       _showError('Fout bij verzenden ping: $e');
     }
   }
-  
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,11 +78,7 @@ class _ClientGameScreenState extends State<ClientGameScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.videogame_asset,
-                      color: Colors.green,
-                      size: 32,
-                    ),
+                    Icon(Icons.videogame_asset, color: Colors.green, size: 32),
                     SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -131,7 +121,7 @@ class _ClientGameScreenState extends State<ClientGameScreen> {
               ],
             ),
           ),
-          
+
           // Berichten log
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -150,9 +140,9 @@ class _ClientGameScreenState extends State<ClientGameScreen> {
               ],
             ),
           ),
-          
+
           SizedBox(height: 12),
-          
+
           // Berichten lijst
           Expanded(
             child: Container(
@@ -187,7 +177,7 @@ class _ClientGameScreenState extends State<ClientGameScreen> {
                     ),
             ),
           ),
-          
+
           SizedBox(height: 16),
         ],
       ),

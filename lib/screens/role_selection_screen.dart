@@ -3,7 +3,7 @@ import 'host_screen.dart';
 import 'client_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
-  const RoleSelectionScreen({Key? key}) : super(key: key);
+  const RoleSelectionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -17,13 +17,9 @@ class RoleSelectionScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Logo / Title
-              Icon(
-                Icons.credit_card,
-                size: 100,
-                color: Colors.blue[400],
-              ),
+              Icon(Icons.credit_card, size: 100, color: Colors.blue[400]),
               SizedBox(height: 24),
-              
+
               Text(
                 'BlueCard',
                 textAlign: TextAlign.center,
@@ -33,20 +29,17 @@ class RoleSelectionScreen extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-              
+
               SizedBox(height: 12),
-              
+
               Text(
                 'Kies je rol',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey[400],
-                ),
+                style: TextStyle(fontSize: 18, color: Colors.grey[400]),
               ),
-              
+
               SizedBox(height: 64),
-              
+
               // Host Button
               _RoleButton(
                 icon: Icons.router,
@@ -60,9 +53,9 @@ class RoleSelectionScreen extends StatelessWidget {
                   );
                 },
               ),
-              
+
               SizedBox(height: 24),
-              
+
               // Client Button
               _RoleButton(
                 icon: Icons.smartphone,
@@ -117,15 +110,11 @@ class _RoleButton extends StatelessWidget {
                   color: color.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  size: 32,
-                  color: color,
-                ),
+                child: Icon(icon, size: 32, color: color),
               ),
-              
+
               SizedBox(width: 20),
-              
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -141,20 +130,13 @@ class _RoleButton extends StatelessWidget {
                     SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[400],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[400]),
                     ),
                   ],
                 ),
               ),
-              
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey[600],
-                size: 20,
-              ),
+
+              Icon(Icons.arrow_forward_ios, color: Colors.grey[600], size: 20),
             ],
           ),
         ),

@@ -4,19 +4,19 @@ import 'package:flutter/material.dart';
 class PlayerList extends StatelessWidget {
   final int playerCount;
   final List<String> playerIds;
-  
+
   const PlayerList({
-    Key? key,
+    super.key,
     required this.playerCount,
     required this.playerIds,
-  }) : super(key: key);
-  
+  });
+
   @override
   Widget build(BuildContext context) {
     if (playerIds.isEmpty) {
       return SizedBox.shrink();
     }
-    
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16),
       padding: EdgeInsets.all(16),

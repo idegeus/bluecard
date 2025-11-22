@@ -3,19 +3,16 @@ import 'package:flutter/material.dart';
 /// Herbruikbaar widget voor berichten log met inklapbare functionaliteit
 class MessageLog extends StatefulWidget {
   final List<String> messages;
-  
-  const MessageLog({
-    Key? key,
-    required this.messages,
-  }) : super(key: key);
-  
+
+  const MessageLog({super.key, required this.messages});
+
   @override
   State<MessageLog> createState() => _MessageLogState();
 }
 
 class _MessageLogState extends State<MessageLog> {
   bool _isExpanded = false; // Start collapsed
-  
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -51,7 +48,7 @@ class _MessageLogState extends State<MessageLog> {
             ),
           ),
         ),
-        
+
         // Log container (only show when expanded)
         if (_isExpanded)
           Expanded(
@@ -67,10 +64,7 @@ class _MessageLogState extends State<MessageLog> {
                   ? Center(
                       child: Text(
                         'Nog geen berichten...',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
                       ),
                     )
                   : ListView.builder(
@@ -93,7 +87,7 @@ class _MessageLogState extends State<MessageLog> {
                     ),
             ),
           ),
-        
+
         // Collapsed placeholder
         if (!_isExpanded)
           Container(
@@ -109,10 +103,7 @@ class _MessageLogState extends State<MessageLog> {
                 SizedBox(width: 8),
                 Text(
                   '${widget.messages.length} berichten',
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
                 ),
               ],
             ),

@@ -8,13 +8,13 @@ class GameScreen extends StatefulWidget {
   final BluetoothHost? bluetoothHost;
   final BluetoothClient? bluetoothClient;
   final bool isHost;
-  
+
   const GameScreen({
-    Key? key,
+    super.key,
     this.bluetoothHost,
     this.bluetoothClient,
     required this.isHost,
-  }) : super(key: key);
+  });
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -26,7 +26,7 @@ class _GameScreenState extends State<GameScreen> {
     super.initState();
     _setupListeners();
   }
-  
+
   void _setupListeners() {
     if (!widget.isHost && widget.bluetoothClient != null) {
       // Luister naar goodbye messages van host
@@ -38,7 +38,7 @@ class _GameScreenState extends State<GameScreen> {
       });
     }
   }
-  
+
   void _showHostQuitDialog() {
     showDialog(
       context: context,
@@ -64,13 +64,15 @@ class _GameScreenState extends State<GameScreen> {
             onPressed: () async {
               // Sluit dialog
               Navigator.pop(context);
-              
+
               // Disconnect en ga naar home
               await widget.bluetoothClient?.disconnect();
               // NIET dispose() aanroepen - streams blijven beschikbaar
-              
+
               if (mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/', (route) => false);
               }
             },
             child: Text('OK'),
@@ -79,28 +81,28 @@ class _GameScreenState extends State<GameScreen> {
       ),
     );
   }
-  
+
   void _showConnectionInfo() {
     final now = DateTime.now();
-    
+
     // Haal lastSync direct uit de service
-    final DateTime? lastSync = widget.isHost 
-        ? widget.bluetoothHost?.lastSyncTime 
+    final DateTime? lastSync = widget.isHost
+        ? widget.bluetoothHost?.lastSyncTime
         : widget.bluetoothClient?.lastSyncTime;
-    
-    final timeSinceLastSync = lastSync != null 
-        ? now.difference(lastSync).inSeconds 
+
+    final timeSinceLastSync = lastSync != null
+        ? now.difference(lastSync).inSeconds
         : null;
-    
+
     // Haal playerIds en count direct uit de service
     final List<String> playerIds = widget.isHost
         ? (widget.bluetoothHost?.playerIds ?? [])
         : (widget.bluetoothClient?.playerIds ?? []);
-    
+
     final int playerCount = widget.isHost
         ? (widget.bluetoothHost?.totalPlayerCount ?? 0)
         : (widget.bluetoothClient?.playerCount ?? 0);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -109,10 +111,7 @@ class _GameScreenState extends State<GameScreen> {
           children: [
             Icon(Icons.info_outline, color: Colors.blue[400]),
             SizedBox(width: 8),
-            Text(
-              'Verbindingsinfo',
-              style: TextStyle(color: Colors.white),
-            ),
+            Text('Verbindingsinfo', style: TextStyle(color: Colors.white)),
           ],
         ),
         content: Column(
@@ -125,32 +124,40 @@ class _GameScreenState extends State<GameScreen> {
               value: widget.isHost ? 'Host' : 'Client',
             ),
             SizedBox(height: 12),
-            
+
             _buildInfoRow(
               icon: Icons.people,
               label: 'Spelers',
               value: '$playerCount (${playerIds.join(", ")})',
             ),
             SizedBox(height: 12),
-            
+
             _buildInfoRow(
               icon: Icons.wifi_tethering,
               label: 'Laatste sync',
-              value: timeSinceLastSync != null 
+              value: timeSinceLastSync != null
                   ? '$timeSinceLastSync seconden geleden'
                   : 'Nog geen sync',
             ),
             SizedBox(height: 12),
-            
+
             _buildInfoRow(
               icon: Icons.check_circle,
               label: 'Status',
-              value: widget.isHost 
-                  ? (widget.bluetoothHost?.isAdvertising ?? false ? 'Actief' : 'Gestopt')
-                  : (widget.bluetoothClient?.isConnected ?? false ? 'Verbonden' : 'Niet verbonden'),
-              valueColor: widget.isHost 
-                  ? (widget.bluetoothHost?.isAdvertising ?? false ? Colors.green : Colors.red)
-                  : (widget.bluetoothClient?.isConnected ?? false ? Colors.green : Colors.red),
+              value: widget.isHost
+                  ? (widget.bluetoothHost?.isAdvertising ?? false
+                        ? 'Actief'
+                        : 'Gestopt')
+                  : (widget.bluetoothClient?.isConnected ?? false
+                        ? 'Verbonden'
+                        : 'Niet verbonden'),
+              valueColor: widget.isHost
+                  ? (widget.bluetoothHost?.isAdvertising ?? false
+                        ? Colors.green
+                        : Colors.red)
+                  : (widget.bluetoothClient?.isConnected ?? false
+                        ? Colors.green
+                        : Colors.red),
             ),
           ],
         ),
@@ -163,7 +170,7 @@ class _GameScreenState extends State<GameScreen> {
       ),
     );
   }
-  
+
   Future<void> _confirmQuitGame() async {
     final bool? confirmed = await showDialog<bool>(
       context: context,
@@ -173,14 +180,11 @@ class _GameScreenState extends State<GameScreen> {
           children: [
             Icon(Icons.exit_to_app, color: Colors.orange[400]),
             SizedBox(width: 8),
-            Text(
-              'Game afsluiten?',
-              style: TextStyle(color: Colors.white),
-            ),
+            Text('Game afsluiten?', style: TextStyle(color: Colors.white)),
           ],
         ),
         content: Text(
-          widget.isHost 
+          widget.isHost
               ? 'Weet je zeker dat je de game wilt afsluiten? Alle spelers worden ontkoppeld.'
               : 'Weet je zeker dat je de game wilt verlaten?',
           style: TextStyle(color: Colors.grey[400]),
@@ -192,42 +196,38 @@ class _GameScreenState extends State<GameScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[700],
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700]),
             child: Text('Afsluiten'),
           ),
         ],
       ),
     );
-    
+
     if (confirmed == true && mounted) {
       await _quitGame();
     }
   }
-  
+
   Future<void> _quitGame() async {
     try {
       // Toon loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (context) => Center(child: CircularProgressIndicator()),
       );
-      
+
       // Roep de juiste quit methode aan
       if (widget.isHost) {
         await widget.bluetoothHost?.quitGame();
       } else {
         await widget.bluetoothClient?.quitGame();
       }
-      
+
       // Verwijder loading indicator
       if (mounted) {
         Navigator.pop(context);
-        
+
         // Ga terug naar home screen
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       }
@@ -235,7 +235,7 @@ class _GameScreenState extends State<GameScreen> {
       // Verwijder loading indicator
       if (mounted) {
         Navigator.pop(context);
-        
+
         // Toon error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -246,7 +246,7 @@ class _GameScreenState extends State<GameScreen> {
       }
     }
   }
-  
+
   Widget _buildInfoRow({
     required IconData icon,
     required String label,
@@ -259,10 +259,7 @@ class _GameScreenState extends State<GameScreen> {
         SizedBox(width: 8),
         Text(
           '$label:',
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 14,
-          ),
+          style: TextStyle(color: Colors.grey[400], fontSize: 14),
         ),
         SizedBox(width: 8),
         Expanded(
@@ -279,7 +276,7 @@ class _GameScreenState extends State<GameScreen> {
       ],
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -310,64 +307,51 @@ class _GameScreenState extends State<GameScreen> {
           ],
         ),
         body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.games,
-              size: 100,
-              color: Colors.grey[700],
-            ),
-            SizedBox(height: 24),
-            Text(
-              'Game gestart!',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.games, size: 100, color: Colors.grey[700]),
+              SizedBox(height: 24),
+              Text(
+                'Game gestart!',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Spel implementatie komt hier',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[400],
+              SizedBox(height: 12),
+              Text(
+                'Spel implementatie komt hier',
+                style: TextStyle(fontSize: 16, color: Colors.grey[400]),
               ),
-            ),
-            SizedBox(height: 32),
-            Container(
-              padding: EdgeInsets.all(16),
-              margin: EdgeInsets.symmetric(horizontal: 32),
-              decoration: BoxDecoration(
-                color: Colors.grey[850],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    widget.isHost ? '🎮 Je bent de host' : '🎯 Je speelt mee',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white,
+              SizedBox(height: 32),
+              Container(
+                padding: EdgeInsets.all(16),
+                margin: EdgeInsets.symmetric(horizontal: 32),
+                decoration: BoxDecoration(
+                  color: Colors.grey[850],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      widget.isHost ? '🎮 Je bent de host' : '🎯 Je speelt mee',
+                      style: TextStyle(fontSize: 18, color: Colors.white),
                     ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    widget.isHost
-                        ? '${widget.bluetoothHost?.connectedClientCount ?? 0} speler(s) verbonden'
-                        : '${widget.bluetoothClient?.playerCount ?? 0} totale spelers',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[400],
+                    SizedBox(height: 8),
+                    Text(
+                      widget.isHost
+                          ? '${widget.bluetoothHost?.connectedClientCount ?? 0} speler(s) verbonden'
+                          : '${widget.bluetoothClient?.playerCount ?? 0} totale spelers',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[400]),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
