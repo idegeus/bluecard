@@ -319,192 +319,203 @@ class _HostScreenState extends State<HostScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[900],
-      appBar: AppBar(title: Text('Host'), backgroundColor: Colors.green[700]),
-      body: Column(
-        children: [
-          // Status kaart
-          Container(
-            margin: EdgeInsets.all(16),
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey[850],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      _isServerStarted
-                          ? Icons.check_circle
-                          : Icons.radio_button_unchecked,
-                      color: _isServerStarted ? Colors.green : Colors.grey,
-                      size: 32,
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _isServerStarted
-                                ? 'Server actief'
-                                : 'Server gestopt',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            _isServerStarted
-                                ? 'Wachten op clients...'
-                                : 'Start de server om te beginnen',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                if (!_isServerStarted) ...[
-                  SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _startServer,
-                      icon: Icon(Icons.play_arrow),
-                      label: Text('Start Server'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                ],
-
-                if (_isServerStarted) ...[
-                  SizedBox(height: 20),
-
-                  // Toon geselecteerd spel
-                  if (_selectedGameType != null) ...[
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green),
-                      ),
-                      child: Row(
-                        children: [
-                          Text(
-                            _selectedGameType!.emoji,
-                            style: TextStyle(fontSize: 24),
-                          ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Geselecteerd: ${_selectedGameType!.displayName}',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  _selectedGameType!.description,
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.close, color: Colors.white),
-                            onPressed: _bluetoothHost.gameStarted
-                                ? null
-                                : () {
-                                    setState(() {
-                                      _selectedGameType = null;
-                                    });
-                                  },
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                  ],
-
+      appBar: AppBar(
+        title: Text('Spel starten'),
+        backgroundColor: Color(0xFF0D2E15),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0D2E15), Color(0xFF06210F), Color(0xFF04170B)],
+          ),
+        ),
+        child: Column(
+          children: [
+            // Status kaart
+            Container(
+              margin: EdgeInsets.all(16),
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey[850],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _bluetoothHost.gameStarted
-                              ? null
-                              : _startGame,
-                          icon: Icon(Icons.play_arrow),
-                          label: Text(
-                            _selectedGameType == null
-                                ? 'Kies Spel'
-                                : 'Start Game',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
+                      Icon(
+                        _isServerStarted
+                            ? Icons.check_circle
+                            : Icons.radio_button_unchecked,
+                        color: _isServerStarted ? Colors.green : Colors.grey,
+                        size: 32,
                       ),
-                      SizedBox(width: 12),
+                      SizedBox(width: 16),
                       Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _sendPing,
-                          icon: Icon(Icons.wifi_tethering),
-                          label: Text('Ping'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: _stopServer,
-                        icon: Icon(Icons.stop),
-                        label: Text('Stop'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _isServerStarted
+                                  ? 'Server actief'
+                                  : 'Server gestopt',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              _isServerStarted
+                                  ? 'Wachten op clients...'
+                                  : 'Start de server om te beginnen',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
+
+                  if (!_isServerStarted) ...[
+                    SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _startServer,
+                        icon: Icon(Icons.play_arrow),
+                        label: Text('Start Server'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  if (_isServerStarted) ...[
+                    SizedBox(height: 20),
+
+                    // Toon geselecteerd spel
+                    if (_selectedGameType != null) ...[
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              _selectedGameType!.emoji,
+                              style: TextStyle(fontSize: 24),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Geselecteerd: ${_selectedGameType!.displayName}',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    _selectedGameType!.description,
+                                    style: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.close, color: Colors.white),
+                              onPressed: _bluetoothHost.gameStarted
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _selectedGameType = null;
+                                      });
+                                    },
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                    ],
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _bluetoothHost.gameStarted
+                                ? null
+                                : _startGame,
+                            icon: Icon(Icons.play_arrow),
+                            label: Text(
+                              _selectedGameType == null
+                                  ? 'Kies Spel'
+                                  : 'Start Game',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _sendPing,
+                            icon: Icon(Icons.wifi_tethering),
+                            label: Text('Ping'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _stopServer,
+                          icon: Icon(Icons.stop),
+                          label: Text('Stop'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
 
-          // Spelers lijst
-          if (_bluetoothHost.playerIds.isNotEmpty) ...[
-            PlayerList(
-              playerCount: _bluetoothHost.totalPlayerCount,
-              playerIds: _bluetoothHost.playerIds,
-            ),
-            SizedBox(height: 16),
+            // Spelers lijst
+            if (_bluetoothHost.playerIds.isNotEmpty) ...[
+              PlayerList(
+                playerCount: _bluetoothHost.totalPlayerCount,
+                playerIds: _bluetoothHost.playerIds,
+              ),
+              SizedBox(height: 16),
+            ],
+
+            // Berichten log
+            Expanded(child: MessageLog(messages: _messages)),
           ],
-
-          // Berichten log
-          Expanded(child: MessageLog(messages: _messages)),
-        ],
+        ),
       ),
     );
   }

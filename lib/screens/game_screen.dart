@@ -289,70 +289,66 @@ class _GameScreenState extends State<GameScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.grey[900],
         appBar: AppBar(
-          title: Text(widget.isHost ? 'BlueCard - Host' : 'BlueCard - Speler'),
-          backgroundColor: widget.isHost ? Colors.green[700] : Colors.blue[700],
-          automaticallyImplyLeading: false, // Verwijder terugknop
-          actions: [
-            // Info button
-            IconButton(
-              icon: Icon(Icons.info_outline),
-              onPressed: _showConnectionInfo,
-              tooltip: 'Verbindingsinfo',
-            ),
-            // Quit button
-            IconButton(
-              icon: Icon(Icons.exit_to_app),
-              onPressed: _confirmQuitGame,
-              tooltip: 'Game afsluiten',
-            ),
-          ],
+          backgroundColor: Color(0xFF0D2E15),
+          foregroundColor: Colors.white,
+          title: Text('Game Screen'),
         ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.games, size: 100, color: Colors.grey[700]),
-              SizedBox(height: 24),
-              Text(
-                'Game gestart!',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF0D2E15), Color(0xFF06210F), Color(0xFF04170B)],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.games, size: 100, color: Colors.grey[700]),
+                SizedBox(height: 24),
+                Text(
+                  'Game gestart!',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              SizedBox(height: 12),
-              Text(
-                'Spel implementatie komt hier',
-                style: TextStyle(fontSize: 16, color: Colors.grey[400]),
-              ),
-              SizedBox(height: 32),
-              Container(
-                padding: EdgeInsets.all(16),
-                margin: EdgeInsets.symmetric(horizontal: 32),
-                decoration: BoxDecoration(
-                  color: Colors.grey[850],
-                  borderRadius: BorderRadius.circular(12),
+                SizedBox(height: 12),
+                Text(
+                  'Spel implementatie komt hier',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[400]),
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      widget.isHost ? '🎮 Je bent de host' : '🎯 Je speelt mee',
-                      style: TextStyle(fontSize: 18, color: Colors.white),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      widget.isHost
-                          ? '${widget.bluetoothHost?.connectedClientCount ?? 0} speler(s) verbonden'
-                          : '${widget.bluetoothClient?.playerCount ?? 0} totale spelers',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[400]),
-                    ),
-                  ],
+                SizedBox(height: 32),
+                Container(
+                  padding: EdgeInsets.all(16),
+                  margin: EdgeInsets.symmetric(horizontal: 32),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[850],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        widget.isHost
+                            ? '🎮 Je bent de host'
+                            : '🎯 Je speelt mee',
+                        style: TextStyle(fontSize: 18, color: Colors.white),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        widget.isHost
+                            ? '${widget.bluetoothHost?.connectedClientCount ?? 0} speler(s) verbonden'
+                            : '${widget.bluetoothClient?.playerCount ?? 0} totale spelers',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

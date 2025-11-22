@@ -207,145 +207,138 @@ class _ClientScreenState extends State<ClientScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[900],
       appBar: AppBar(
-        title: Text('Client'),
-        backgroundColor: Colors.blue[700],
-        actions: [
-          if (_isConnected)
-            Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Center(
-                child: Row(
-                  children: [
-                    Icon(Icons.circle, size: 12, color: Colors.green[300]),
-                    SizedBox(width: 8),
-                    Text('Verbonden'),
-                  ],
-                ),
-              ),
-            ),
-        ],
+        backgroundColor: Color(0xFF0D2E15),
+        foregroundColor: Colors.white,
       ),
-      body: Column(
-        children: [
-          // Status kaart
-          Container(
-            margin: EdgeInsets.all(16),
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey[850],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      _isConnected
-                          ? Icons.check_circle
-                          : Icons.radio_button_unchecked,
-                      color: _isConnected ? Colors.green : Colors.grey,
-                      size: 32,
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _isConnected ? 'Verbonden' : 'Niet verbonden',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            _isConnected
-                                ? 'Host: ${_hostName ?? "Onbekend"}'
-                                : 'Zoek naar een host om te verbinden',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 20),
-
-                if (!_isConnected) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isSearching ? null : _searchAndConnect,
-                      icon: _isSearching
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Icon(Icons.search),
-                      label: Text(_isSearching ? 'Zoeken...' : 'Zoek Host'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                ],
-
-                if (_isConnected) ...[
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0D2E15), Color(0xFF06210F), Color(0xFF04170B)],
+          ),
+        ),
+        child: Column(
+          children: [
+            // Status kaart
+            Container(
+              margin: EdgeInsets.all(16),
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey[850],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _sendTestAction,
-                          icon: Icon(Icons.send),
-                          label: Text('Test Actie'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
+                      Icon(
+                        _isConnected
+                            ? Icons.check_circle
+                            : Icons.radio_button_unchecked,
+                        color: _isConnected ? Colors.green : Colors.grey,
+                        size: 32,
                       ),
-                      SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: _disconnect,
-                        icon: Icon(Icons.close),
-                        label: Text('Disconnect'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          padding: EdgeInsets.symmetric(vertical: 16),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _isConnected ? 'Verbonden' : 'Niet verbonden',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              _isConnected
+                                  ? 'Host: ${_hostName ?? "Onbekend"}'
+                                  : 'Zoek naar een host om te verbinden',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
+
+                  SizedBox(height: 20),
+
+                  if (!_isConnected) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isSearching ? null : _searchAndConnect,
+                        icon: _isSearching
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(Icons.search),
+                        label: Text(_isSearching ? 'Zoeken...' : 'Zoek Host'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  if (_isConnected) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _sendTestAction,
+                            icon: Icon(Icons.send),
+                            label: Text('Test Actie'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _disconnect,
+                          icon: Icon(Icons.close),
+                          label: Text('Disconnect'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
 
-          // Spelers lijst (alleen tonen als verbonden en er spelers zijn)
-          if (_isConnected && _bluetoothClient.playerIds.isNotEmpty) ...[
-            PlayerList(
-              playerCount: _bluetoothClient.playerCount,
-              playerIds: _bluetoothClient.playerIds,
-            ),
-            SizedBox(height: 16),
+            // Spelers lijst (alleen tonen als verbonden en er spelers zijn)
+            if (_isConnected && _bluetoothClient.playerIds.isNotEmpty) ...[
+              PlayerList(
+                playerCount: _bluetoothClient.playerCount,
+                playerIds: _bluetoothClient.playerIds,
+              ),
+              SizedBox(height: 16),
+            ],
+
+            // Berichten log
+            Expanded(child: MessageLog(messages: _messages)),
           ],
-
-          // Berichten log
-          Expanded(child: MessageLog(messages: _messages)),
-        ],
+        ),
       ),
     );
   }
