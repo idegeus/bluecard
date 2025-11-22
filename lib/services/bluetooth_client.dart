@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import '../models/game_message.dart';
@@ -76,6 +77,16 @@ class BluetoothClient {
     _playerId = id;
   }
 
+  /// Update device naam (bijv. na settings wijziging)
+  Future<void> updateDeviceName() async {
+    try {
+      _deviceName = await SettingsService.getUserName();
+      _log('📱 Device naam geüpdatet: $_deviceName');
+    } catch (e) {
+      _log('⚠️ Kon device naam niet updaten: $e');
+    }
+  }
+
   /// Helper om berichten zowel naar UI als debug log te sturen
   void _log(String message) {
     _messageController.add(message);
@@ -99,11 +110,10 @@ class BluetoothClient {
 
           // Initialiseer met minimale player informatie
           // Deze wordt overschreven door playerJoined message van host
-          _playerCount = 2; // Host + jezelf
-          _playerIds = ['host', _playerId];
+          _playerCount = 1; // Alleen host tot we welcome message krijgen
+          _playerIds = ['host'];
           _playerNames = {
             'host': 'Host', // Wordt later overschreven
-            _playerId: _deviceName,
           };
         } else {
           _log('⚠️ Verbinding verbroken');
@@ -124,79 +134,21 @@ class BluetoothClient {
         _lastDataReceived = DateTime.now();
         _resetConnectionTimeout();
 
-        // Alle berichten zijn nu GameMessages
+        // Check of dit een GameMessage is of een welcome/join response
         try {
-          final gameMessage = GameMessage.fromJson(message);
-          _gameMessageController.add(gameMessage);
+          final Map<String, dynamic> data = jsonDecode(message);
 
-          _log('📨 Ontvangen ${gameMessage.type.name} van host');
-
-          // Handle specifieke message types
-          switch (gameMessage.type) {
-            case GameMessageType.ping:
-              // Update last sync time
-              final now = DateTime.now();
-              _lastSyncTime = now;
-              if (!_lastSyncController.isClosed) {
-                _lastSyncController.add(now);
-              }
-
-              // Update host name if provided in ping
-              if (gameMessage.deviceName != null) {
-                _connectedHostName = gameMessage.deviceName!;
-              }
-              break;
-
-            case GameMessageType.startGame:
-              _log('🎮 Game gestart door host!');
-              break;
-
-            case GameMessageType.playerJoined:
-              if (gameMessage.content != null) {
-                final List<String> receivedPlayerIds = List<String>.from(
-                  gameMessage.content!['playerIds'] ?? [],
-                );
-
-                // Voeg jezelf toe aan de lijst als je er nog niet in staat
-                if (!receivedPlayerIds.contains(_playerId)) {
-                  receivedPlayerIds.add(_playerId);
-                }
-
-                _playerCount = receivedPlayerIds.length;
-                _playerIds = receivedPlayerIds;
-
-                // Update player names mapping
-                final Map<String, dynamic>? playerNamesData =
-                    gameMessage.content!['playerNames'];
-                if (playerNamesData != null) {
-                  _playerNames.clear();
-                  playerNamesData.forEach((playerId, name) {
-                    _playerNames[playerId] = name.toString();
-                  });
-                }
-
-                // Voeg je eigen naam toe aan de mapping
-                _playerNames[_playerId] = _deviceName;
-
-                // Update host name if provided
-                if (gameMessage.deviceName != null) {
-                  _connectedHostName = gameMessage.deviceName!;
-                }
-
-                _log('👥 Speler toegevoegd! Totaal: $_playerCount spelers');
-                _log('📋 Spelers: ${_playerIds.join(", ")}');
-                _log('🏷️  Namen: ${_playerNames.values.join(", ")}');
-              }
-              break;
-
-            case GameMessageType.goodbye:
-              _log('👋 Host heeft game afgesloten');
-              break;
+          // Als het bericht 'isWelcome' bevat, is het een join response van de host
+          if (data.containsKey('isWelcome') && data['isWelcome'] == true) {
+            _handleWelcomeMessage(data);
           }
-
-          // Log content als het bestaat
-          if (gameMessage.content != null && gameMessage.content!.isNotEmpty) {
-            _log('📦 Content: ${gameMessage.content}');
+          // Anders proberen als GameMessage te parsen
+          else if (data.containsKey('type') && data.containsKey('timestamp')) {
+            final gameMessage = GameMessage.fromJson(message);
+            _gameMessageController.add(gameMessage);
+            _handleGameMessage(gameMessage);
+          } else {
+            _log('⚠️ Onbekend bericht format: $message');
           }
         } catch (e) {
           _log('❌ Fout bij parsen bericht: $e');
@@ -282,6 +234,9 @@ class BluetoothClient {
     }
 
     try {
+      // Update device naam voor real-time accuracy
+      await updateDeviceName();
+
       final pingMessage = GameMessage(
         type: GameMessageType.ping,
         timestamp: DateTime.now().millisecondsSinceEpoch,
@@ -383,6 +338,9 @@ class BluetoothClient {
     }
 
     try {
+      // Update device naam voor real-time accuracy
+      await updateDeviceName();
+
       final message = GameMessage(
         type: type,
         timestamp: DateTime.now().millisecondsSinceEpoch,
@@ -455,6 +413,105 @@ class BluetoothClient {
     // dispose() wordt aangeroepen door de app wanneer deze echt afsluit
 
     _log('✅ Game afgesloten');
+  }
+
+  void _handleWelcomeMessage(Map<String, dynamic> data) {
+    _log('🎉 Ontvangen welcome bericht van host');
+
+    // Update player info from welcome message
+    if (data.containsKey('playerIds')) {
+      _playerIds = List<String>.from(data['playerIds'] ?? []);
+      _playerCount = _playerIds.length;
+    }
+
+    if (data.containsKey('playerNames')) {
+      final Map<String, dynamic> playerNamesData = data['playerNames'];
+      _playerNames.clear();
+      playerNamesData.forEach((playerId, name) {
+        _playerNames[playerId] = name.toString();
+      });
+    }
+
+    if (data.containsKey('hostName')) {
+      _connectedHostName = data['hostName'];
+    }
+
+    if (data.containsKey('newPlayerId')) {
+      _playerId = data['newPlayerId'];
+    }
+
+    _log('👥 Player info bijgewerkt! Totaal: $_playerCount spelers');
+    _log('📋 Spelers: ${_playerIds.join(", ")}');
+    _log('🏷️ Namen: ${_playerNames.values.join(", ")}');
+  }
+
+  void _handleGameMessage(GameMessage gameMessage) {
+    _log('📨 Ontvangen ${gameMessage.type.name} van host');
+
+    // Handle specifieke message types
+    switch (gameMessage.type) {
+      case GameMessageType.ping:
+        // Update last sync time
+        final now = DateTime.now();
+        _lastSyncTime = now;
+        if (!_lastSyncController.isClosed) {
+          _lastSyncController.add(now);
+        }
+
+        // Update host name if provided in ping
+        if (gameMessage.deviceName != null) {
+          _connectedHostName = gameMessage.deviceName!;
+        }
+        break;
+
+      case GameMessageType.startGame:
+        _log('🎮 Game gestart door host!');
+        break;
+
+      case GameMessageType.playerJoined:
+        if (gameMessage.content != null) {
+          // Gebruik de player lijst van de host als leidend
+          _playerIds = List<String>.from(
+            gameMessage.content!['playerIds'] ?? [],
+          );
+
+          // Voeg jezelf toe aan de lijst als je er nog niet in staat
+          if (!_playerIds.contains(_playerId)) {
+            _playerIds.add(_playerId);
+          }
+
+          _playerCount = _playerIds.length;
+
+          // Update player names mapping van de host
+          final Map<String, dynamic>? playerNamesData =
+              gameMessage.content!['playerNames'];
+          if (playerNamesData != null) {
+            _playerNames.clear();
+            playerNamesData.forEach((playerId, name) {
+              _playerNames[playerId] = name.toString();
+            });
+          }
+
+          // Update host name if provided
+          if (gameMessage.deviceName != null) {
+            _connectedHostName = gameMessage.deviceName!;
+          }
+
+          _log('👥 Speler toegevoegd! Totaal: $_playerCount spelers');
+          _log('📋 Spelers: ${_playerIds.join(", ")}');
+          _log('🏷️ Namen: ${_playerNames.values.join(", ")}');
+        }
+        break;
+
+      case GameMessageType.goodbye:
+        _log('👋 Host heeft game afgesloten');
+        break;
+    }
+
+    // Log content als het bestaat
+    if (gameMessage.content != null && gameMessage.content!.isNotEmpty) {
+      _log('📦 Content: ${gameMessage.content}');
+    }
   }
 
   void dispose() {

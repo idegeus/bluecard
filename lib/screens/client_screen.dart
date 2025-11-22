@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/bluetooth_client.dart';
+import '../services/settings_service.dart';
 import '../models/game_message.dart';
 import '../widgets/player_list.dart';
 import '../widgets/message_log.dart';
@@ -19,7 +20,7 @@ class _ClientScreenState extends State<ClientScreen> {
   final List<String> _messages = [];
   bool _isConnected = false;
   bool _isSearching = false;
-  String? _hostName;
+  String _currentUserName = '';
 
   // Stream subscriptions om te kunnen cancellen
   late final List<StreamSubscription> _subscriptions;
@@ -30,11 +31,26 @@ class _ClientScreenState extends State<ClientScreen> {
     _subscriptions = [];
     _setupListeners();
     _requestPermissions();
+    _loadUserName();
 
     // Automatisch beginnen met zoeken naar hosts zodra screen geladen is
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchAndConnect();
     });
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final userName = await SettingsService.getUserName();
+      if (mounted) {
+        setState(() {
+          _currentUserName = userName;
+        });
+      }
+    } catch (e) {
+      // Fallback als SettingsService niet beschikbaar is
+      _currentUserName = 'Mijn Apparaat';
+    }
   }
 
   void _setupListeners() {
@@ -64,10 +80,7 @@ class _ClientScreenState extends State<ClientScreen> {
           setState(() {
             _isConnected = connected;
             if (connected) {
-              _hostName = _bluetoothClient.connectedHostName ?? 'BlueCard Host';
               _isSearching = false; // Stop searching wanneer verbonden
-            } else {
-              _hostName = null;
             }
           });
         }
@@ -213,158 +226,155 @@ class _ClientScreenState extends State<ClientScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Color(0xFF0D2E15),
-        foregroundColor: Colors.white,
-        title: Text('Meedoen aan spel'),
-        actions: [
-          if (_isConnected) ...[
-            IconButton(
-              icon: Icon(Icons.network_check),
-              onPressed: _sendTestAction,
-              tooltip: 'Test Actie',
-            ),
-            IconButton(
-              icon: Icon(Icons.exit_to_app),
-              onPressed: _disconnect,
-              tooltip: 'Disconnect',
-            ),
-          ],
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0D2E15), Color(0xFF06210F), Color(0xFF04170B)],
-          ),
-        ),
-        child: Column(
-          children: [
-            // Status kaart
-            Container(
-              margin: EdgeInsets.all(16),
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Color.fromARGB(255, 9, 32, 15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _isConnected
-                            ? Icons.check_circle
-                            : Icons.radio_button_unchecked,
-                        color: _isConnected ? Colors.green : Colors.grey,
-                        size: 32,
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _isConnected ? 'Verbonden' : 'Niet verbonden',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              _isConnected
-                                  ? 'Host: ${_hostName ?? "Onbekend"}'
-                                  : 'Zoek naar een host om te verbinden',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  if (!_isConnected) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _isSearching ? null : _searchAndConnect,
-                        icon: _isSearching
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Icon(Icons.search),
-                        label: Text(_isSearching ? 'Zoeken...' : 'Zoek Host'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            // Spelers lijst (alleen tonen als verbonden en er spelers zijn)
-            if (_isConnected && _bluetoothClient.playerIds.isNotEmpty) ...[
-              PlayerList(
-                playerCount: _bluetoothClient.playerCount,
-                playerIds: _bluetoothClient.playerIds,
-                playerInfo: _buildPlayerInfoList(),
-              ),
-              SizedBox(height: 16),
-            ],
-
-            // Berichten log
-            Expanded(child: MessageLog(messages: _messages)),
-
-            // Wachten op game start
+    return PopScope(
+      onPopInvokedWithResult: (didPop, result) async {
+        if (_isConnected) {
+          await _disconnect();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Color(0xFF0D2E15),
+          foregroundColor: Colors.white,
+          title: Text('Meedoen aan spel'),
+          actions: [
             if (_isConnected) ...[
+              IconButton(
+                icon: Icon(Icons.network_check),
+                onPressed: _sendTestAction,
+                tooltip: 'Test Actie',
+              ),
+              IconButton(
+                icon: Icon(Icons.exit_to_app),
+                onPressed: _disconnect,
+                tooltip: 'Disconnect',
+              ),
+            ],
+          ],
+        ),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF0D2E15), Color(0xFF06210F), Color(0xFF04170B)],
+            ),
+          ),
+          child: Column(
+            children: [
+              // Status kaart
               Container(
                 margin: EdgeInsets.all(16),
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Color.fromARGB(255, 9, 32, 15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Column(
                   children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+                    if (_isConnected) ...[
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 32,
+                          ),
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Verbonden met ${_bluetoothClient.connectedHostName ?? "onbekende host"}',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    SizedBox(width: 12),
-                    Text(
-                      'Wachten tot het spel wordt gestart...',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                    ],
+
+                    if (!_isConnected) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSearching ? null : _searchAndConnect,
+                          icon: _isSearching
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Icon(Icons.search),
+                          label: Text(_isSearching ? 'Zoeken...' : 'Zoek Host'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
+
+              // Spelers lijst (alleen tonen als verbonden en er spelers zijn)
+              if (_isConnected && _bluetoothClient.playerIds.isNotEmpty) ...[
+                PlayerList(
+                  playerCount: _bluetoothClient.playerCount,
+                  playerIds: _bluetoothClient.playerIds,
+                  playerInfo: _buildPlayerInfoList(),
+                ),
+                SizedBox(height: 16),
+              ],
+
+              // Berichten log
+              Expanded(child: MessageLog(messages: _messages)),
+
+              // Wachten op game start
+              if (_isConnected) ...[
+                Container(
+                  margin: EdgeInsets.all(16),
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Color.fromARGB(255, 9, 32, 15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'Wachten tot het spel wordt gestart...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -372,6 +382,9 @@ class _ClientScreenState extends State<ClientScreen> {
 
   /// Bouw player info lijst voor display
   List<Map<String, String>> _buildPlayerInfoList() {
+    // Update gebruikersnaam in background
+    _updateUserNameInBackground();
+
     final List<Map<String, String>> playerInfo = [];
 
     // Host info
@@ -387,14 +400,38 @@ class _ClientScreenState extends State<ClientScreen> {
     final playerNames = _bluetoothClient.playerNames;
     for (String playerId in _bluetoothClient.playerIds) {
       if (playerId != 'host') {
+        String playerName;
+
+        // Als dit onze eigen player ID is, gebruik onze gebruikersnaam uit settings
+        if (playerId == _bluetoothClient.playerId) {
+          playerName = _currentUserName.isNotEmpty
+              ? _currentUserName
+              : _bluetoothClient.deviceName;
+        } else {
+          // Voor andere clients, gebruik de naam van de host mapping
+          playerName = playerNames[playerId] ?? 'Unknown Player';
+        }
+
         playerInfo.add({
           'playerId': playerId,
-          'name': playerNames[playerId] ?? 'Unknown Player',
+          'name': playerName,
           'address': '',
         });
       }
     }
 
     return playerInfo;
+  }
+
+  void _updateUserNameInBackground() {
+    SettingsService.getUserName().then((name) {
+      if (_currentUserName != name) {
+        setState(() {
+          _currentUserName = name;
+        });
+        // Update ook de bluetooth client device name
+        _bluetoothClient.updateDeviceName();
+      }
+    });
   }
 }

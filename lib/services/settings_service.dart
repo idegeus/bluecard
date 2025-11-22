@@ -6,16 +6,11 @@ import 'package:device_info_plus/device_info_plus.dart';
 class SettingsService {
   static const String _userNameKey = 'user_display_name';
 
-  static String? _cachedUserName;
   static String? _cachedDeviceName;
 
   /// Haal of genereer de gebruikersnaam
   /// Standaard wordt de apparaatnaam gebruikt
   static Future<String> getUserName() async {
-    if (_cachedUserName != null) {
-      return _cachedUserName!;
-    }
-
     final prefs = await SharedPreferences.getInstance();
     String? savedName = prefs.getString(_userNameKey);
 
@@ -25,7 +20,6 @@ class SettingsService {
       await prefs.setString(_userNameKey, savedName);
     }
 
-    _cachedUserName = savedName;
     return savedName;
   }
 
@@ -37,10 +31,8 @@ class SettingsService {
       // Als naam leeg is, ga terug naar apparaatnaam
       final deviceName = await _getDeviceName();
       await prefs.setString(_userNameKey, deviceName);
-      _cachedUserName = deviceName;
     } else {
       await prefs.setString(_userNameKey, name.trim());
-      _cachedUserName = name.trim();
     }
   }
 
@@ -91,7 +83,6 @@ class SettingsService {
 
   /// Clear cache (voor testing)
   static void clearCache() {
-    _cachedUserName = null;
     _cachedDeviceName = null;
   }
 }

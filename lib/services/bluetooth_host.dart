@@ -50,6 +50,9 @@ class BluetoothHost {
   }
 
   List<Map<String, String>> get playerInfo {
+    // Update host name in background zonder te wachten
+    _updateHostNameInBackground();
+
     final info = [
       {
         'playerId': 'host',
@@ -58,13 +61,26 @@ class BluetoothHost {
       },
     ];
     for (var client in _connectedClients) {
+      final playerId = client['playerId'] ?? 'unknown';
+      // Gebruik device name uit client berichten als beschikbaar, anders fallback
+      final name = _clientDeviceNames[playerId] ?? client['name'] ?? 'Unknown';
       info.add({
-        'playerId': client['playerId'] ?? 'unknown',
-        'name': client['name'] ?? 'Unknown',
+        'playerId': playerId,
+        'name': name,
         'address': client['address'] ?? '',
       });
     }
     return info;
+  }
+
+  void _updateHostNameInBackground() {
+    SettingsService.getUserName().then((name) {
+      if (_currentHostName != name) {
+        _currentHostName = name;
+        // Trigger UI refresh
+        _playerIdsController.add(playerIds);
+      }
+    });
   }
 
   bool get isAdvertising => _isAdvertising;
@@ -76,6 +92,32 @@ class BluetoothHost {
   BluetoothHost() {
     // Setup method call handler voor callbacks van native service
     _channel.setMethodCallHandler(_handleNativeCallback);
+
+    // Initialiseer host naam uit settings
+    _initializeHostName();
+  }
+
+  /// Initialiseer host naam uit settings
+  Future<void> _initializeHostName() async {
+    try {
+      _currentHostName = await SettingsService.getUserName();
+      _log('🖥️ Host naam: $_currentHostName');
+    } catch (e) {
+      _currentHostName = 'Host';
+      _log('⚠️ Kon host naam niet ophalen: $e');
+    }
+  }
+
+  /// Update host naam (bijv. na settings wijziging)
+  Future<void> updateHostName() async {
+    try {
+      _currentHostName = await SettingsService.getUserName();
+      _log('🖥️ Host naam geüpdatet: $_currentHostName');
+      // Trigger UI update door playerIds opnieuw te versturen
+      _playerIdsController.add(playerIds);
+    } catch (e) {
+      _log('⚠️ Kon host naam niet updaten: $e');
+    }
   }
 
   /// Helper om berichten zowel naar UI als debug log te sturen
@@ -356,6 +398,9 @@ class BluetoothHost {
 
   /// Stuur een ping
   Future<void> sendPing() async {
+    // Update host naam voor real-time accuracy
+    await updateHostName();
+
     final now = DateTime.now();
     final pingMessage = GameMessage(
       type: GameMessageType.ping,
@@ -401,10 +446,13 @@ class BluetoothHost {
 
   /// Stuur welcome message met complete player info naar alle clients
   Future<void> _sendWelcomeMessage(String newPlayerId) async {
+    // Update host naam voor real-time accuracy
+    await updateHostName();
+
     // Verzamel alle player IDs (host + alle clients)
     final List<String> playerIds = ['host'];
     final Map<String, String> playerNames = {
-      'host': _currentHostName ?? await SettingsService.getUserName(),
+      'host': _currentHostName ?? 'Host',
     };
 
     for (var client in _connectedClients) {
