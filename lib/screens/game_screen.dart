@@ -292,7 +292,22 @@ class _GameScreenState extends State<GameScreen> {
         appBar: AppBar(
           backgroundColor: Color(0xFF0D2E15),
           foregroundColor: Colors.white,
-          title: Text('Game Screen'),
+          title: Text('Spel'),
+          automaticallyImplyLeading: false, // Verwijder terugknop
+          actions: [
+            // Info button
+            IconButton(
+              icon: Icon(Icons.info_outline),
+              onPressed: _showConnectionInfo,
+              tooltip: 'Verbindingsinfo',
+            ),
+            // Quit button
+            IconButton(
+              icon: Icon(Icons.exit_to_app),
+              onPressed: _confirmQuitGame,
+              tooltip: 'Game afsluiten',
+            ),
+          ],
         ),
         body: Container(
           decoration: BoxDecoration(

@@ -138,7 +138,15 @@ class _HostGameScreenState extends State<HostGameScreen> {
       appBar: AppBar(
         backgroundColor: Color(0xFF0D2E15),
         foregroundColor: Colors.white,
-        title: Text('Host Game Screen'),
+        title: Text('Spel'),
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.info_outline),
+            tooltip: 'Verbindingsinfo',
+            onPressed: _showConnectionInfo,
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(

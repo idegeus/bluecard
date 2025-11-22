@@ -104,7 +104,11 @@ class BluetoothHost {
     _log('👥 Totaal clients: ${_connectedClients.length}');
 
     // Stuur een gecombineerde welcome message met assignment en player lijst
-    _sendWelcomeMessage(playerId);
+    // Kleine delay om te zorgen dat client notifications goed ingesteld zijn
+    Future.delayed(Duration(milliseconds: 500), () {
+      // Stuur playerJoined message naar alle clients
+      _sendWelcomeMessage(playerId);
+    });
   }
 
   /// Client verbroken callback
@@ -339,7 +343,7 @@ class BluetoothHost {
       timestamp: DateTime.now().millisecondsSinceEpoch,
       playerId: _playerId,
       content: {
-        'playerCount': playerIds.length,
+        'playerCount': playerIds.length + 1,
         'playerIds': playerIds,
         'newPlayerId': newPlayerId, // Wie er net is toegevoegd
         'isWelcome': true, // Flag om te herkennen als welcome
