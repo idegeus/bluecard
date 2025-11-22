@@ -75,20 +75,10 @@ class RoleSelectionScreen extends StatelessWidget {
                     return _CardFan(fanHeight: fanHeight);
                   },
                 ),
-                SizedBox(height: 24),
-                Text(
-                  'Kies je rol',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                SizedBox(height: 20),
+                SizedBox(height: 72),
                 _RoleButton(
-                  icon: Icons.router,
-                  title: 'Host',
-                  subtitle: 'Start een nieuw spel',
+                  icon: Icons.group, // Updated to a more suitable icon for Host
+                  title: 'Spel starten',
                   color: Colors.green,
                   onTap: () {
                     Navigator.push(
@@ -99,9 +89,8 @@ class RoleSelectionScreen extends StatelessWidget {
                 ),
                 SizedBox(height: 18),
                 _RoleButton(
-                  icon: Icons.smartphone,
-                  title: 'Speler',
-                  subtitle: 'Verbind met een spel',
+                  icon: Icons.play_arrow, // Updated to a play icon for Speler
+                  title: 'Meedoen aan spel',
                   color: Colors.blue,
                   onTap: () {
                     Navigator.push(
@@ -110,7 +99,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     );
                   },
                 ),
-                SizedBox(height: 28),
+                SizedBox(height: 72),
                 Opacity(
                   opacity: 0.6,
                   child: Text(
@@ -131,14 +120,12 @@ class RoleSelectionScreen extends StatelessWidget {
 class _RoleButton extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
   const _RoleButton({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.color,
     required this.onTap,
   });
@@ -192,15 +179,10 @@ class _RoleButton extends StatelessWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
                       ),
                     ],
                   ),
