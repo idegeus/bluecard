@@ -279,11 +279,14 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      // Blokkeer terugknop - gebruiker moet quit gebruiken
-      onWillPop: () async {
-        _confirmQuitGame();
-        return false;
+    return PopScope(
+      // Blokkeer standaard terug navigatie; toon eigen bevestiging
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        // Als niet gepopt (geblokkeerd) -> toon confirm dialoog
+        if (!didPop) {
+          _confirmQuitGame();
+        }
       },
       child: Scaffold(
         backgroundColor: Colors.grey[900],
