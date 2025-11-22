@@ -398,6 +398,7 @@ class _ClientScreenState extends State<ClientScreen> {
 
     // Client info
     final playerNames = _bluetoothClient.playerNames;
+
     for (String playerId in _bluetoothClient.playerIds) {
       if (playerId != 'host') {
         String playerName;

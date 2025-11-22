@@ -438,11 +438,20 @@ class BluetoothClient {
 
     if (data.containsKey('newPlayerId')) {
       _playerId = data['newPlayerId'];
+      // Zet onze eigen naam in de player names mapping
+      _playerNames[_playerId] = _deviceName;
+      // Voeg onszelf toe aan de playerIds lijst als we er nog niet in staan
+      if (!_playerIds.contains(_playerId)) {
+        _playerIds.add(_playerId);
+        _playerCount = _playerIds.length;
+      }
     }
-
     _log('👥 Player info bijgewerkt! Totaal: $_playerCount spelers');
     _log('📋 Spelers: ${_playerIds.join(", ")}');
     _log('🏷️ Namen: ${_playerNames.values.join(", ")}');
+
+    // Stuur direct een ping om onze naam bekend te maken aan de host
+    sendPing();
   }
 
   void _handleGameMessage(GameMessage gameMessage) {
