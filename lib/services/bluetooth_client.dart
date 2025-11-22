@@ -235,7 +235,7 @@ class BluetoothClient {
 
       if (success) {
         _log('✅ Client Service gestart!');
-        _log('🔍 Zoeken naar BlueCard hosts...');
+        _log('🔍 Zoeken naar hosts...');
         _log('🔔 Notificatie actief - service draait in achtergrond');
       } else {
         _log('❌ Client Service kon niet starten');

@@ -53,7 +53,7 @@ class BlueCardClientService : Service() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             result?.let { scanResult ->
                 val deviceName = scanResult.device.name
-                if (deviceName != null && deviceName.contains("BlueCard", ignoreCase = true)) {
+                if (deviceName != null && deviceName.contains("-Host-", ignoreCase = true)) {
                     Log.d(TAG, "✅ Found BlueCard host: $deviceName")
                     stopScanning()
                     hostDeviceName = deviceName
@@ -207,7 +207,7 @@ class BlueCardClientService : Service() {
         }
         
         isScanning = true
-        Log.d(TAG, "🔍 Starting BLE scan for BlueCard hosts...")
+        Log.d(TAG, "🔍 Starting BLE scan for hosts...")
         
         try {
             // Scan zonder filters - we filteren handmatig op naam
