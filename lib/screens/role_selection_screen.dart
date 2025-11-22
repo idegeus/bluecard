@@ -114,7 +114,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 Opacity(
                   opacity: 0.6,
                   child: Text(
-                    '© 2025 BlueCard',
+                    '© ${DateTime.now().year} BlueCard',
                     style: TextStyle(fontSize: 12, color: Colors.grey[300]),
                   ),
                 ),
