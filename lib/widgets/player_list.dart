@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../services/player_identity_service.dart';
+import '../services/settings_service.dart';
 
 /// Herbruikbaar widget om spelerlijst te tonen
-class PlayerList extends StatelessWidget {
+class PlayerList extends StatefulWidget {
   final int playerCount;
   final List<String> playerIds;
 
@@ -12,8 +14,32 @@ class PlayerList extends StatelessWidget {
   });
 
   @override
+  State<PlayerList> createState() => _PlayerListState();
+}
+
+class _PlayerListState extends State<PlayerList> {
+  String? _currentUserName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final userName = await SettingsService.getUserName();
+      setState(() {
+        _currentUserName = userName;
+      });
+    } catch (e) {
+      // Fallback, geen gebruikersnaam beschikbaar
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (playerIds.isEmpty) {
+    if (widget.playerIds.isEmpty) {
       return SizedBox.shrink();
     }
 
@@ -32,7 +58,7 @@ class PlayerList extends StatelessWidget {
               Icon(Icons.people, color: Colors.blue[400], size: 24),
               SizedBox(width: 8),
               Text(
-                'Spelers ($playerCount)',
+                'Spelers (${widget.playerCount})',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -45,8 +71,9 @@ class PlayerList extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: playerIds.map((playerId) {
-              final isHost = playerId == 'host';
+            children: widget.playerIds.map((playerId) {
+              final isHost = playerId.startsWith('host');
+              final displayName = _getDisplayName(playerId);
               return Container(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -66,7 +93,7 @@ class PlayerList extends StatelessWidget {
                     ),
                     SizedBox(width: 6),
                     Text(
-                      playerId,
+                      displayName,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -81,5 +108,20 @@ class PlayerList extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Zet player ID om naar leesbare naam
+  String _getDisplayName(String playerId) {
+    if (playerId.startsWith('host')) {
+      // Voor host, gebruik de gebruikersnaam of 'Host' als fallback
+      return _currentUserName ?? 'Host';
+    } else if (playerId.startsWith('client_')) {
+      final digest = playerId.substring(7); // Verwijder 'client_' prefix
+      return PlayerIdentityService.getReadableName(digest);
+    } else if (playerId.startsWith('connecting_')) {
+      return 'Verbinden...';
+    } else {
+      return playerId; // Fallback voor oude IDs
+    }
   }
 }

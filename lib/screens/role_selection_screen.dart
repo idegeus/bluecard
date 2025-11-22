@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'host_screen.dart';
 import 'client_screen.dart';
+import 'settings_screen.dart';
 import '../widgets/suit_card.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
@@ -10,6 +11,23 @@ class RoleSelectionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => SettingsScreen()),
+              );
+            },
+            icon: Icon(Icons.settings, color: Colors.white),
+            tooltip: 'Instellingen',
+          ),
+        ],
+      ),
+      extendBodyBehindAppBar: true,
       body: Container(
         height: screenHeight,
         decoration: BoxDecoration(
