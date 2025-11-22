@@ -136,10 +136,7 @@ class _HostScreenState extends State<HostScreen> {
       return;
     }
 
-    // Check of de host alleen is en nog geen warning heeft gezien
-    if (_bluetoothHost.totalPlayerCount == 1 && !_hasShownSoloWarning) {
-      _hasShownSoloWarning = true;
-      _showSoloWarning();
+    if (_bluetoothHost.totalPlayerCount == 1) {
       return;
     }
 
@@ -152,35 +149,6 @@ class _HostScreenState extends State<HostScreen> {
     } catch (e) {
       _showError('Fout bij starten game: $e');
     }
-  }
-
-  void _showSoloWarning() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[850],
-        title: Row(
-          children: [
-            Icon(Icons.person, color: Colors.orange, size: 28),
-            SizedBox(width: 12),
-            Text(
-              'Je bent alleen!',
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
-          ],
-        ),
-        content: Text(
-          'Wacht op meer spelers, of druk nog een keer op Start om solo te spelen.',
-          style: TextStyle(color: Colors.grey[300], fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK', style: TextStyle(color: Colors.green)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showGameTypeSelector() {
@@ -328,146 +296,153 @@ class _HostScreenState extends State<HostScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Spel starten'),
-        backgroundColor: Color(0xFF0D2E15),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.network_check),
-            onPressed: _sendPing,
-            tooltip: 'Ping',
-          ),
-          if (_isServerStarted)
+    return PopScope(
+      onPopInvokedWithResult: (didPop, result) async {
+        if (_isServerStarted) {
+          await _stopServer();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Spel starten'),
+          backgroundColor: Color(0xFF0D2E15),
+          foregroundColor: Colors.white,
+          actions: [
             IconButton(
-              icon: Icon(Icons.stop_circle_outlined),
-              onPressed: _stopServer,
-              tooltip: 'Stop Server',
+              icon: Icon(Icons.network_check),
+              onPressed: _sendPing,
+              tooltip: 'Ping',
             ),
-          if (!_isServerStarted)
-            IconButton(
-              icon: Icon(Icons.play_circle_outline),
-              onPressed: _startServer,
-              tooltip: 'Start Server',
-            ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0D2E15), Color(0xFF06210F), Color(0xFF04170B)],
-          ),
-        ),
-        child: Column(
-          children: [
-            // Spelers lijst
-            if (_bluetoothHost.playerIds.isNotEmpty) ...[
-              PlayerList(
-                playerCount: _bluetoothHost.totalPlayerCount,
-                playerIds: _bluetoothHost.playerIds,
+            if (_isServerStarted)
+              IconButton(
+                icon: Icon(Icons.stop_circle_outlined),
+                onPressed: _stopServer,
+                tooltip: 'Stop Server',
               ),
-              SizedBox(height: 16),
-            ],
+            if (!_isServerStarted)
+              IconButton(
+                icon: Icon(Icons.play_circle_outline),
+                onPressed: _startServer,
+                tooltip: 'Start Server',
+              ),
+          ],
+        ),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF0D2E15), Color(0xFF06210F), Color(0xFF04170B)],
+            ),
+          ),
+          child: Column(
+            children: [
+              // Spelers lijst
+              if (_bluetoothHost.playerIds.isNotEmpty) ...[
+                PlayerList(
+                  playerCount: _bluetoothHost.totalPlayerCount,
+                  playerIds: _bluetoothHost.playerIds,
+                ),
+                SizedBox(height: 16),
+              ],
 
-            // Berichten log
-            Expanded(child: MessageLog(messages: _messages)),
+              // Berichten log
+              Expanded(child: MessageLog(messages: _messages)),
 
-            // Wachten op spelers tekst - toon als server actief is maar geen spelers verbonden zijn
-            if (_isServerStarted && _bluetoothHost.playerIds.length <= 1) ...[
-              Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(
-                  child: Text(
-                    'Wachten op spelers...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[400],
-                      fontStyle: FontStyle.italic,
+              // Wachten op spelers tekst - toon als server actief is maar geen spelers verbonden zijn
+              if (_isServerStarted && _bluetoothHost.playerIds.length <= 1) ...[
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: Text(
+                      'Wachten op spelers...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[400],
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
 
-            // Start Spel button at bottom - only show when server is started and players are connected
-            if (_isServerStarted && _bluetoothHost.playerIds.length > 1) ...[
-              Padding(
-                padding: EdgeInsets.all(16),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.green.withOpacity(0.2),
-                        Colors.green.withOpacity(0.1),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
-                        blurRadius: 12,
-                        offset: Offset(0, 6),
+              // Start Spel button at bottom - only show when server is started and players are connected
+              if (_isServerStarted && _bluetoothHost.playerIds.length > 1) ...[
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.green.withOpacity(0.2),
+                          Colors.green.withOpacity(0.1),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                    border: Border.all(
-                      color: Colors.green.withOpacity(0.4),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: !_bluetoothHost.gameStarted ? _startGame : null,
                       borderRadius: BorderRadius.circular(20),
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.green.withOpacity(0.9),
-                                    Colors.green.withOpacity(0.6),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 12,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Colors.green.withOpacity(0.4),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: !_bluetoothHost.gameStarted ? _startGame : null,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.green.withOpacity(0.9),
+                                      Colors.green.withOpacity(0.6),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Icon(
-                                Icons.play_arrow,
-                                size: 32,
-                                color: Colors.white,
-                              ),
-                            ),
-                            SizedBox(width: 20),
-                            Expanded(
-                              child: Text(
-                                'Start Spel',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                child: Icon(
+                                  Icons.play_arrow,
+                                  size: 32,
                                   color: Colors.white,
                                 ),
                               ),
-                            ),
-                          ],
+                              SizedBox(width: 20),
+                              Expanded(
+                                child: Text(
+                                  'Start Spel',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

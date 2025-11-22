@@ -11,7 +11,7 @@ class MessageLog extends StatefulWidget {
 }
 
 class _MessageLogState extends State<MessageLog> {
-  bool _isExpanded = false; // Start collapsed
+  bool _isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -29,10 +29,9 @@ class _MessageLogState extends State<MessageLog> {
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                Icon(Icons.article, color: Colors.grey[600], size: 20),
                 SizedBox(width: 8),
                 Text(
-                  'Berichten Log',
+                  'Debug log',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -53,12 +52,11 @@ class _MessageLogState extends State<MessageLog> {
         if (_isExpanded)
           Expanded(
             child: Container(
-              margin: EdgeInsets.all(16),
-              padding: EdgeInsets.all(12),
+              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.black87,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[800]!),
               ),
               child: widget.messages.isEmpty
                   ? Center(
@@ -94,7 +92,7 @@ class _MessageLogState extends State<MessageLog> {
             margin: EdgeInsets.symmetric(horizontal: 16),
             padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey[850],
+              color: Color.fromARGB(255, 9, 32, 15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(

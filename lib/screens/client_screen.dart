@@ -210,7 +210,7 @@ class _ClientScreenState extends State<ClientScreen> {
       appBar: AppBar(
         backgroundColor: Color(0xFF0D2E15),
         foregroundColor: Colors.white,
-        title: Text('Meespelen'),
+        title: Text('Meedoen aan spel'),
       ),
       body: Container(
         decoration: BoxDecoration(

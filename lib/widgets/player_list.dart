@@ -47,7 +47,7 @@ class _PlayerListState extends State<PlayerList> {
       margin: EdgeInsets.symmetric(horizontal: 16),
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[850],
+        color: Color.fromARGB(255, 9, 32, 15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -55,10 +55,10 @@ class _PlayerListState extends State<PlayerList> {
         children: [
           Row(
             children: [
-              Icon(Icons.people, color: Colors.blue[400], size: 24),
+              Icon(Icons.people, color: Colors.white, size: 24),
               SizedBox(width: 8),
               Text(
-                'Spelers (${widget.playerCount})',
+                'Spelers',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
