@@ -5,6 +5,7 @@ enum GameMessageType {
   startGame,
   ping,
   playerJoined,
+  playerAssignment, // Nieuwe message type voor player ID toewijzing
   goodbye,
 }
 

@@ -34,6 +34,8 @@ class BluetoothClient {
   DateTime? _lastSyncTime;
   List<String> _playerIds = [];
   int _playerCount = 0;
+  bool _hasReceivedAssignment =
+      false; // Track of we al een assignment hebben gehad
   static const Duration _connectionTimeout = Duration(seconds: 30);
 
   Stream<String> get messageStream => _messageController.stream;
@@ -77,9 +79,15 @@ class BluetoothClient {
           _lastDataReceived = DateTime.now();
           _startPingTimer();
           _resetConnectionTimeout();
+
+          // Initialiseer met minimale player informatie
+          // Deze wordt overschreven door playerJoined message van host
+          _playerCount = 1; // Host is er altijd
+          _playerIds = ['host'];
         } else {
           _log('⚠️ Verbinding verbroken');
           _connectedHostName = null;
+          _hasReceivedAssignment = false; // Reset voor herverbinding
           _stopPingTimer();
           _stopConnectionTimeout();
         }
@@ -117,12 +125,43 @@ class BluetoothClient {
 
             case GameMessageType.playerJoined:
               if (gameMessage.content != null) {
+                final isWelcome = gameMessage.content!['isWelcome'] ?? false;
+                final newPlayerId = gameMessage.content!['newPlayerId'];
+
                 _playerCount = gameMessage.content!['playerCount'] ?? 0;
                 _playerIds = List<String>.from(
                   gameMessage.content!['playerIds'] ?? [],
                 );
-                _log('👥 Speler toegevoegd! Totaal: $_playerCount spelers');
-                _log('📋 Spelers: ${_playerIds.join(", ")}');
+
+                if (isWelcome && newPlayerId != null) {
+                  _log(
+                    '🎉 Welcome message ontvangen! Nieuwe speler: $newPlayerId',
+                  );
+                  // Als ik de nieuwe speler ben, update mijn ID
+                  if (!_hasReceivedAssignment) {
+                    _playerId = newPlayerId;
+                    _hasReceivedAssignment = true;
+                    _log('🏷️ Player ID bepaald uit welcome: $_playerId');
+                  }
+                } else {
+                  _log('👥 PlayerJoined update ontvangen');
+                }
+
+                _log(
+                  '📋 Huidige spelers: ${_playerIds.join(", ")} (totaal: $_playerCount)',
+                );
+              }
+              break;
+
+            case GameMessageType.playerAssignment:
+              // Deze wordt nu niet meer gebruikt, maar behouden voor backwards compatibility
+              if (gameMessage.content != null && !_hasReceivedAssignment) {
+                final assignedId = gameMessage.content!['assignedPlayerId'];
+                if (assignedId != null) {
+                  _playerId = assignedId;
+                  _hasReceivedAssignment = true;
+                  _log('🏷️ Player ID toegewezen (legacy): $_playerId');
+                }
               }
               break;
 
