@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/game_message.dart';
+import 'settings_service.dart';
 
 /// BluetoothHost - GATT Server via Foreground Service
 /// Beheert de GATT service, notificaties naar clients, en verbindingen
@@ -174,9 +175,10 @@ class BluetoothHost {
         _log('✅ Bluetooth aangezet');
       }
 
-      // Genereer unieke host naam met BlueCard
+      // Genereer host naam met gebruikersnaam
+      final userName = await SettingsService.getUserName();
       final hostId = DateTime.now().millisecondsSinceEpoch % 10000;
-      _currentHostName = 'BlueCard-Host-$hostId';
+      _currentHostName = '$userName-Host-$hostId';
 
       _log('🚀 Starting Host Service...');
       _log('📱 Device name: $_currentHostName');
