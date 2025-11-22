@@ -117,7 +117,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     );
                   },
                 ),
-                SizedBox(height: 72),
+                SizedBox(height: 24),
                 Opacity(
                   opacity: 0.6,
                   child: Text(
@@ -154,16 +154,26 @@ class _RoleButton extends StatelessWidget {
       duration: Duration(milliseconds: 350),
       curve: Curves.easeOut,
       decoration: BoxDecoration(
-        color: Colors.grey[850],
+        gradient: LinearGradient(
+          colors: [
+            color.withOpacity(0.2), // Light gradient start
+            color.withOpacity(0.1), // Light gradient end
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
+            color: Colors.black.withOpacity(0.5),
             blurRadius: 12,
             offset: Offset(0, 6),
           ),
         ],
-        border: Border.all(color: color.withValues(alpha: 0.4), width: 1.2),
+        border: Border.all(
+          color: color.withOpacity(0.4), // Gradient-like border
+          width: 1.2,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
