@@ -112,6 +112,11 @@ class BluetoothHost {
     _playerIdsController.add(playerIds); // Broadcast nieuwe player lijst
     _log('📴 Client verbroken: $name ($address)');
     _log('👥 Totaal clients: ${_connectedClients.length}');
+
+    // Stuur update naar alle overgebleven clients
+    if (_connectedClients.isNotEmpty) {
+      _sendPlayerLeftMessage();
+    }
   }
 
   /// Data ontvangen callback - alle berichten zijn GameMessages
@@ -344,6 +349,31 @@ class BluetoothHost {
       '📢 Welcome message verzonden: ${playerIds.length} spelers (nieuw: $newPlayerId)',
     );
     _log('👥 Huidige spelers: ${playerIds.join(", ")}');
+  }
+
+  /// Stuur update dat een speler is weggegaan
+  Future<void> _sendPlayerLeftMessage() async {
+    // Verzamel alle player IDs (host + alle clients)
+    final List<String> playerIds = ['host'];
+    for (var client in _connectedClients) {
+      playerIds.add(client['playerId'] ?? 'unknown');
+    }
+
+    // Stuur update naar alle clients
+    final leftMessage = GameMessage(
+      type: GameMessageType.playerJoined,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      playerId: _playerId,
+      content: {
+        'playerCount': playerIds.length,
+        'playerIds': playerIds,
+        'isWelcome': false,
+      },
+    );
+
+    await _sendGameMessage(leftMessage);
+    _log('👋 Player left message verzonden: ${playerIds.length} spelers');
+    _log('👥 Overgebleven spelers: ${playerIds.join(", ")}');
   }
 
   /// Start automatische ping timer (elke 10 seconden)
