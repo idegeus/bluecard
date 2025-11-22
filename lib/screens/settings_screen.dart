@@ -93,51 +93,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _resetPlayerIdentity() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Speler Identiteit Resetten'),
-        content: Text(
-          'Dit genereert een nieuwe unieke speler-ID. '
-          'Andere spelers zullen je als een nieuwe speler zien. '
-          'Weet je het zeker?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Annuleren'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text('Resetten'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await PlayerIdentityService.resetIdentity();
-        final newDigest = await PlayerIdentityService.getPlayerDigest();
-        setState(() {
-          _playerDigest = newDigest;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Nieuwe speler identiteit gegenereerd'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      } catch (e) {
-        _showError('Kon identiteit niet resetten: $e');
-      }
-    }
-  }
-
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -268,23 +223,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                      SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: _resetPlayerIdentity,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange[700],
-                          foregroundColor: Colors.white,
-                        ),
-                        child: Text('Nieuwe Identiteit Genereren'),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Let op: Na het resetten zien andere spelers je als een nieuwe speler.',
-                        style: TextStyle(
-                          color: Colors.orange[300],
-                          fontSize: 12,
                         ),
                       ),
                     ],
