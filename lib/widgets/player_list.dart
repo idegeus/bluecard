@@ -95,20 +95,45 @@ class _PlayerListState extends State<PlayerList> {
                       color: isHost ? Colors.green[300] : Colors.blue[300],
                     ),
                     SizedBox(width: 6),
-                    Text(
-                      displayName,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    _buildPlayerNameWidget(displayName),
                   ],
                 ),
               );
             }).toList(),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Build widget voor player naam met loading indicator voor unknown namen
+  Widget _buildPlayerNameWidget(String displayName) {
+    // Als de naam nog niet geladen is, toon loading indicator
+    if (displayName == 'Unknown' || displayName == 'Host') {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Colors.white.withOpacity(0.7),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Normale naam
+    return Text(
+      displayName,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
       ),
     );
   }
