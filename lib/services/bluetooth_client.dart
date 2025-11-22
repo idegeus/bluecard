@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import '../models/game_message.dart';
+import '../services/settings_service.dart';
 
 /// BluetoothClient - Verbindt met de GATT server van de host via ClientService
 /// Beheert de verbinding via een Foreground Service die in de achtergrond draait
@@ -27,12 +28,14 @@ class BluetoothClient {
   bool _isConnected = false;
   bool _isScanning = false;
   String _playerId = 'client';
+  String _deviceName = '';
   String? _connectedHostName;
   Timer? _pingTimer;
   Timer? _connectionTimeoutTimer;
   DateTime? _lastDataReceived;
   DateTime? _lastSyncTime;
   List<String> _playerIds = [];
+  Map<String, String> _playerNames = {}; // playerId -> device name mapping
   int _playerCount = 0;
   static const Duration _connectionTimeout = Duration(seconds: 30);
 
@@ -44,13 +47,29 @@ class BluetoothClient {
   bool get isScanning => _isScanning;
   String? get connectedHostName => _connectedHostName;
   String get playerId => _playerId;
+  String get deviceName => _deviceName;
   DateTime? get lastSyncTime => _lastSyncTime;
   List<String> get playerIds => _playerIds;
+  Map<String, String> get playerNames => Map.from(_playerNames);
   int get playerCount => _playerCount;
 
   BluetoothClient() {
     // Setup callback handlers voor berichten van de ClientService
     _channel.setMethodCallHandler(_handleCallback);
+
+    // Initialiseer device naam
+    _initializeDeviceName();
+  }
+
+  /// Initialiseer device naam
+  Future<void> _initializeDeviceName() async {
+    try {
+      _deviceName = await SettingsService.getUserName();
+      _log('📱 Device naam: $_deviceName');
+    } catch (e) {
+      _deviceName = 'Onbekend Apparaat';
+      _log('⚠️ Kon device naam niet ophalen: $e');
+    }
   }
 
   void setPlayerId(String id) {
@@ -80,11 +99,18 @@ class BluetoothClient {
 
           // Initialiseer met minimale player informatie
           // Deze wordt overschreven door playerJoined message van host
-          _playerCount = 1; // Host is er altijd
-          _playerIds = ['host'];
+          _playerCount = 2; // Host + jezelf
+          _playerIds = ['host', _playerId];
+          _playerNames = {
+            'host': 'Host', // Wordt later overschreven
+            _playerId: _deviceName,
+          };
         } else {
           _log('⚠️ Verbinding verbroken');
           _connectedHostName = null;
+          _playerIds.clear();
+          _playerNames.clear();
+          _playerCount = 0;
           _stopPingTimer();
           _stopConnectionTimeout();
         }
@@ -114,6 +140,11 @@ class BluetoothClient {
               if (!_lastSyncController.isClosed) {
                 _lastSyncController.add(now);
               }
+
+              // Update host name if provided in ping
+              if (gameMessage.deviceName != null) {
+                _connectedHostName = gameMessage.deviceName!;
+              }
               break;
 
             case GameMessageType.startGame:
@@ -122,12 +153,39 @@ class BluetoothClient {
 
             case GameMessageType.playerJoined:
               if (gameMessage.content != null) {
-                _playerCount = gameMessage.content!['playerCount'] ?? 0;
-                _playerIds = List<String>.from(
+                final List<String> receivedPlayerIds = List<String>.from(
                   gameMessage.content!['playerIds'] ?? [],
                 );
+
+                // Voeg jezelf toe aan de lijst als je er nog niet in staat
+                if (!receivedPlayerIds.contains(_playerId)) {
+                  receivedPlayerIds.add(_playerId);
+                }
+
+                _playerCount = receivedPlayerIds.length;
+                _playerIds = receivedPlayerIds;
+
+                // Update player names mapping
+                final Map<String, dynamic>? playerNamesData =
+                    gameMessage.content!['playerNames'];
+                if (playerNamesData != null) {
+                  _playerNames.clear();
+                  playerNamesData.forEach((playerId, name) {
+                    _playerNames[playerId] = name.toString();
+                  });
+                }
+
+                // Voeg je eigen naam toe aan de mapping
+                _playerNames[_playerId] = _deviceName;
+
+                // Update host name if provided
+                if (gameMessage.deviceName != null) {
+                  _connectedHostName = gameMessage.deviceName!;
+                }
+
                 _log('👥 Speler toegevoegd! Totaal: $_playerCount spelers');
                 _log('📋 Spelers: ${_playerIds.join(", ")}');
+                _log('🏷️  Namen: ${_playerNames.values.join(", ")}');
               }
               break;
 
@@ -228,6 +286,7 @@ class BluetoothClient {
         type: GameMessageType.ping,
         timestamp: DateTime.now().millisecondsSinceEpoch,
         playerId: _playerId,
+        deviceName: _deviceName,
       );
 
       final jsonString = pingMessage.toJson();
@@ -328,6 +387,7 @@ class BluetoothClient {
         type: type,
         timestamp: DateTime.now().millisecondsSinceEpoch,
         playerId: _playerId,
+        deviceName: _deviceName,
         content: content,
       );
 

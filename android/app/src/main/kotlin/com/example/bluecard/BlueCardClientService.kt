@@ -264,6 +264,8 @@ class BlueCardClientService : Service() {
                     isConnected = false
                     currentMtu = 23  // Reset naar standaard
                     dataBuffer.clear() // Clear buffer bij disconnect
+                    writeQueue.clear() // Clear write queue bij disconnect
+                    isWriting = false // Reset write state
                     updateNotification("Disconnected")
                     onConnectionStateChanged?.invoke(false)
                 }
@@ -378,7 +380,30 @@ class BlueCardClientService : Service() {
                 }
             }
         }
+        
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt?,
+            characteristic: BluetoothGattCharacteristic?,
+            status: Int
+        ) {
+            super.onCharacteristicWrite(gatt, characteristic, status)
+            
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG, "✅ Chunk write confirmed by host")
+            } else {
+                Log.e(TAG, "❌ Chunk write failed, status=$status")
+                writeQueue.clear() // Clear queue bij fout
+            }
+            
+            // Mark schrijfoperatie als voltooid en process de volgende chunk
+            isWriting = false
+            processWriteQueue()
+        }
     }
+    
+    // Queue voor outgoing data chunks
+    private val writeQueue = mutableListOf<ByteArray>()
+    private var isWriting = false
     
     /**
      * Stuur data naar de host (gebruikt MTU voor optimale packet size)
@@ -392,41 +417,71 @@ class BlueCardClientService : Service() {
         try {
             // Gebruik current MTU voor optimale chunk size
             val payloadSize = currentMtu - 3  // ATT overhead is 3 bytes
-            val totalChunks = (data.size + payloadSize - 1) / payloadSize
             
-            Log.d(TAG, "📦 Sending ${data.size} bytes (MTU=$currentMtu, payload=$payloadSize, chunks=$totalChunks)")
+            Log.d(TAG, "📦 Queuing ${data.size} bytes for transmission (MTU=$currentMtu, payload=$payloadSize)")
             
-            // Verstuur elke chunk
-            for (i in 0 until totalChunks) {
-                val start = i * payloadSize
-                val end = minOf(start + payloadSize, data.size)
-                val chunk = data.copyOfRange(start, end)
-                
-                gameCharacteristic?.value = chunk
-                val success = bluetoothGatt?.writeCharacteristic(gameCharacteristic) ?: false
-                
-                if (success) {
-                    Log.d(TAG, "📤 Chunk ${i + 1}/$totalChunks (${chunk.size} bytes) sent to host")
-                    
-                    // Kleine delay alleen bij meerdere chunks
-                    if (totalChunks > 1 && i < totalChunks - 1) {
-                        Thread.sleep(5) // 5ms delay
-                    }
-                } else {
-                    Log.e(TAG, "❌ Failed to send chunk ${i + 1}")
-                    return false
-                }
+            // Split data in chunks en voeg toe aan queue
+            var offset = 0
+            while (offset < data.size) {
+                val chunkSize = minOf(payloadSize, data.size - offset)
+                val chunk = data.copyOfRange(offset, offset + chunkSize)
+                writeQueue.add(chunk)
+                offset += chunkSize
             }
             
-            Log.d(TAG, "✅ All chunks sent successfully")
+            Log.d(TAG, "📋 Added ${writeQueue.size} chunks to write queue")
+            
+            // Start schrijven als er geen actieve schrijfoperatie is
+            if (!isWriting) {
+                processWriteQueue()
+            }
+            
             return true
             
         } catch (e: SecurityException) {
             Log.e(TAG, "❌ Permission denied: ${e.message}")
             return false
-        } catch (e: InterruptedException) {
-            Log.e(TAG, "❌ Interrupted while sending chunks: ${e.message}")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error queuing data: ${e.message}")
             return false
+        }
+    }
+    
+    /**
+     * Process de write queue - stuur chunks één voor één met callback handling
+     */
+    private fun processWriteQueue() {
+        if (writeQueue.isEmpty() || isWriting || !isConnected || gameCharacteristic == null) {
+            if (writeQueue.isEmpty()) {
+                Log.d(TAG, "✅ Write queue is empty - all data sent")
+            }
+            return
+        }
+        
+        isWriting = true
+        val chunk = writeQueue.removeAt(0)
+        
+        try {
+            gameCharacteristic?.value = chunk
+            val success = bluetoothGatt?.writeCharacteristic(gameCharacteristic) ?: false
+            
+            if (success) {
+                Log.d(TAG, "📤 Sending chunk (${chunk.size} bytes), ${writeQueue.size} remaining")
+                // Note: processWriteQueue() wordt aangeroepen vanuit onCharacteristicWrite callback
+            } else {
+                Log.e(TAG, "❌ Failed to initiate write for chunk")
+                isWriting = false
+                writeQueue.clear() // Clear queue bij fout
+            }
+            
+        } catch (e: SecurityException) {
+            Log.e(TAG, "❌ Permission denied writing characteristic: ${e.message}")
+            isWriting = false
+            writeQueue.clear()
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error writing characteristic: ${e.message}")
+            isWriting = false
+            writeQueue.clear()
         }
     }
     
@@ -444,5 +499,7 @@ class BlueCardClientService : Service() {
         bluetoothGatt = null
         gameCharacteristic = null
         isConnected = false
+        writeQueue.clear() // Clear write queue
+        isWriting = false // Reset write state
     }
 }

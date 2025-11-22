@@ -6,11 +6,14 @@ import '../services/settings_service.dart';
 class PlayerList extends StatefulWidget {
   final int playerCount;
   final List<String> playerIds;
+  final List<Map<String, String>>?
+  playerInfo; // Optional player info with names
 
   const PlayerList({
     super.key,
     required this.playerCount,
     required this.playerIds,
+    this.playerInfo,
   });
 
   @override
@@ -112,6 +115,18 @@ class _PlayerListState extends State<PlayerList> {
 
   /// Zet player ID om naar leesbare naam
   String _getDisplayName(String playerId) {
+    // First check if we have playerInfo with names
+    if (widget.playerInfo != null) {
+      final playerData = widget.playerInfo!.firstWhere(
+        (player) => player['playerId'] == playerId,
+        orElse: () => {},
+      );
+      if (playerData.isNotEmpty && playerData['name'] != null) {
+        return playerData['name']!;
+      }
+    }
+
+    // Fallback to old logic
     if (playerId.startsWith('host')) {
       // Voor host, gebruik de gebruikersnaam of 'Host' als fallback
       return _currentUserName ?? 'Host';

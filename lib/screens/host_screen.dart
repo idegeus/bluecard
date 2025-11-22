@@ -24,7 +24,6 @@ class _HostScreenState extends State<HostScreen> {
   final List<String> _messages = [];
   bool _isServerStarted = false;
   GameType? _selectedGameType;
-  bool _hasShownSoloWarning = false;
 
   // Stream subscriptions om te kunnen cancellen
   late final List<StreamSubscription> _subscriptions;
@@ -342,6 +341,7 @@ class _HostScreenState extends State<HostScreen> {
                 PlayerList(
                   playerCount: _bluetoothHost.totalPlayerCount,
                   playerIds: _bluetoothHost.playerIds,
+                  playerInfo: _bluetoothHost.playerInfo,
                 ),
                 SizedBox(height: 16),
               ],

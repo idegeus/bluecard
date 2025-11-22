@@ -14,6 +14,10 @@ class BluetoothHost {
   static const MethodChannel _channel = MethodChannel('bluecard.host.service');
 
   final List<Map<String, String>> _connectedClients = [];
+  final Map<String, String> _deviceToPlayerMap =
+      {}; // Map device address to stable player ID
+  final Map<String, String> _clientDeviceNames =
+      {}; // Map playerId to device name
   final StreamController<String> _messageController =
       StreamController.broadcast();
   final StreamController<GameMessage> _gameMessageController =
@@ -36,12 +40,31 @@ class BluetoothHost {
   Stream<List<String>> get playerIdsStream => _playerIdsController.stream;
   int get connectedClientCount => _connectedClients.length;
   int get totalPlayerCount => _connectedClients.length + 1; // +1 voor host
+
   List<String> get playerIds {
     final ids = ['host'];
     for (var client in _connectedClients) {
       ids.add(client['playerId'] ?? 'unknown');
     }
     return ids;
+  }
+
+  List<Map<String, String>> get playerInfo {
+    final info = [
+      {
+        'playerId': 'host',
+        'name': _currentHostName ?? 'Host',
+        'address': 'local',
+      },
+    ];
+    for (var client in _connectedClients) {
+      info.add({
+        'playerId': client['playerId'] ?? 'unknown',
+        'name': client['name'] ?? 'Unknown',
+        'address': client['address'] ?? '',
+      });
+    }
+    return info;
   }
 
   bool get isAdvertising => _isAdvertising;
@@ -91,9 +114,30 @@ class BluetoothHost {
       return;
     }
 
-    // Genereer player ID voor nieuwe client (gebaseerd op aantal spelers)
-    final playerId = 'player${_connectedClients.length + 1}';
+    // Check if this client is already connected (prevent duplicates)
+    final existingClient = _connectedClients.firstWhere(
+      (client) => client['address'] == address,
+      orElse: () => {},
+    );
 
+    if (existingClient.isNotEmpty) {
+      _log('⚠️ Client $name ($address) is al verbonden');
+      return;
+    }
+
+    // Use device address to generate stable player ID
+    String playerId;
+    if (_deviceToPlayerMap.containsKey(address)) {
+      // This device has connected before, reuse its player ID
+      playerId = _deviceToPlayerMap[address]!;
+      _log('🔄 Bekende device: $name herverbonden als $playerId');
+    } else {
+      // New device, assign new player ID
+      final playerNumber = _deviceToPlayerMap.length + 1;
+      playerId = 'player$playerNumber';
+      _deviceToPlayerMap[address] = playerId;
+      _log('🆕 Nieuw device: $name geregistreerd als $playerId');
+    }
     _connectedClients.add({
       'name': name,
       'address': address,
@@ -113,9 +157,20 @@ class BluetoothHost {
 
   /// Client verbroken callback
   void _onClientDisconnected(String name, String address) {
+    final removedClient = _connectedClients.firstWhere(
+      (client) => client['address'] == address,
+      orElse: () => {},
+    );
+
     _connectedClients.removeWhere((client) => client['address'] == address);
     _playerIdsController.add(playerIds); // Broadcast nieuwe player lijst
-    _log('📴 Client verbroken: $name ($address)');
+
+    if (removedClient.isNotEmpty) {
+      final playerId = removedClient['playerId'] ?? 'unknown';
+      _log('📴 Client verbroken: $name ($playerId)');
+    } else {
+      _log('📴 Client verbroken: $name ($address)');
+    }
     _log('👥 Totaal clients: ${_connectedClients.length}');
 
     // Stuur update naar alle overgebleven clients
@@ -132,8 +187,22 @@ class BluetoothHost {
       // Parse als GameMessage
       final gameMessage = GameMessage.fromJson(message);
 
+      // Update device name mapping als aanwezig
+      if (gameMessage.deviceName != null &&
+          gameMessage.deviceName!.isNotEmpty) {
+        _clientDeviceNames[gameMessage.playerId] = gameMessage.deviceName!;
+
+        // Update naam in connected clients lijst
+        final clientIndex = _connectedClients.indexWhere(
+          (client) => client['address'] == address,
+        );
+        if (clientIndex != -1) {
+          _connectedClients[clientIndex]['name'] = gameMessage.deviceName!;
+        }
+      }
+
       _log(
-        '📨 Ontvangen ${gameMessage.type.name} van ${gameMessage.playerId} ($address)',
+        '📨 Ontvangen ${gameMessage.type.name} van ${gameMessage.deviceName ?? gameMessage.playerId} ($address)',
       );
 
       // Log content als het bestaat
@@ -292,6 +361,7 @@ class BluetoothHost {
       type: GameMessageType.ping,
       timestamp: now.millisecondsSinceEpoch,
       playerId: _playerId,
+      deviceName: _currentHostName,
     );
 
     await _sendGameMessage(pingMessage);
@@ -333,8 +403,15 @@ class BluetoothHost {
   Future<void> _sendWelcomeMessage(String newPlayerId) async {
     // Verzamel alle player IDs (host + alle clients)
     final List<String> playerIds = ['host'];
+    final Map<String, String> playerNames = {
+      'host': _currentHostName ?? await SettingsService.getUserName(),
+    };
+
     for (var client in _connectedClients) {
-      playerIds.add(client['playerId'] ?? 'unknown');
+      final playerId = client['playerId'] ?? 'unknown';
+      playerIds.add(playerId);
+      playerNames[playerId] =
+          _clientDeviceNames[playerId] ?? client['name'] ?? 'Unknown';
     }
 
     // Stuur naar alle clients (inclusief de nieuwe)
@@ -342,9 +419,12 @@ class BluetoothHost {
       type: GameMessageType.playerJoined,
       timestamp: DateTime.now().millisecondsSinceEpoch,
       playerId: _playerId,
+      deviceName: _currentHostName,
       content: {
-        'playerCount': playerIds.length + 1,
+        'playerCount': playerIds.length,
         'playerIds': playerIds,
+        'playerNames': playerNames, // Nieuwe field voor namen mapping
+        'hostName': _currentHostName, // Expliciete host naam
         'newPlayerId': newPlayerId, // Wie er net is toegevoegd
         'isWelcome': true, // Flag om te herkennen als welcome
       },
@@ -354,15 +434,22 @@ class BluetoothHost {
     _log(
       '📢 Welcome message verzonden: ${playerIds.length} spelers (nieuw: $newPlayerId)',
     );
-    _log('👥 Huidige spelers: ${playerIds.join(", ")}');
+    _log('👥 Huidige spelers: ${playerNames.values.join(", ")}');
   }
 
   /// Stuur update dat een speler is weggegaan
   Future<void> _sendPlayerLeftMessage() async {
     // Verzamel alle player IDs (host + alle clients)
     final List<String> playerIds = ['host'];
+    final Map<String, String> playerNames = {
+      'host': _currentHostName ?? 'Host',
+    };
+
     for (var client in _connectedClients) {
-      playerIds.add(client['playerId'] ?? 'unknown');
+      final playerId = client['playerId'] ?? 'unknown';
+      playerIds.add(playerId);
+      playerNames[playerId] =
+          _clientDeviceNames[playerId] ?? client['name'] ?? 'Unknown';
     }
 
     // Stuur update naar alle clients
@@ -370,16 +457,19 @@ class BluetoothHost {
       type: GameMessageType.playerJoined,
       timestamp: DateTime.now().millisecondsSinceEpoch,
       playerId: _playerId,
+      deviceName: _currentHostName,
       content: {
         'playerCount': playerIds.length,
         'playerIds': playerIds,
+        'playerNames': playerNames,
+        'hostName': _currentHostName,
         'isWelcome': false,
       },
     );
 
     await _sendGameMessage(leftMessage);
     _log('👋 Player left message verzonden: ${playerIds.length} spelers');
-    _log('👥 Overgebleven spelers: ${playerIds.join(", ")}');
+    _log('👥 Overgebleven spelers: ${playerNames.values.join(", ")}');
   }
 
   /// Start automatische ping timer (elke 10 seconden)

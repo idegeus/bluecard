@@ -9,12 +9,14 @@ class GameMessage {
   final GameMessageType type;
   final int timestamp;
   final String playerId;
+  final String? deviceName; // Apparaatnaam van de verzender
   final Map<String, dynamic>? content; // Optionele content
 
   GameMessage({
     required this.type,
     required this.timestamp,
     required this.playerId,
+    this.deviceName,
     this.content,
   });
 
@@ -25,6 +27,11 @@ class GameMessage {
       'timestamp': timestamp,
       'playerId': playerId,
     };
+
+    // Voeg device name toe als het bestaat
+    if (deviceName != null && deviceName!.isNotEmpty) {
+      map['deviceName'] = deviceName!;
+    }
 
     // Voeg content toe als het bestaat
     if (content != null && content!.isNotEmpty) {
@@ -52,6 +59,7 @@ class GameMessage {
       type: messageType,
       timestamp: data['timestamp'] as int,
       playerId: data['playerId'] as String,
+      deviceName: data['deviceName'] as String?,
       content: data['content'] as Map<String, dynamic>?,
     );
   }

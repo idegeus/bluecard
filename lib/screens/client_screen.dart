@@ -166,6 +166,13 @@ class _ClientScreenState extends State<ClientScreen> {
         'extra': 'Extra informatie',
       },
     );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Ping verzonden naar host'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _showNotification(String message) {
@@ -211,6 +218,20 @@ class _ClientScreenState extends State<ClientScreen> {
         backgroundColor: Color(0xFF0D2E15),
         foregroundColor: Colors.white,
         title: Text('Meedoen aan spel'),
+        actions: [
+          if (_isConnected) ...[
+            IconButton(
+              icon: Icon(Icons.network_check),
+              onPressed: _sendTestAction,
+              tooltip: 'Test Actie',
+            ),
+            IconButton(
+              icon: Icon(Icons.exit_to_app),
+              onPressed: _disconnect,
+              tooltip: 'Disconnect',
+            ),
+          ],
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -227,7 +248,7 @@ class _ClientScreenState extends State<ClientScreen> {
               margin: EdgeInsets.all(16),
               padding: EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.grey[850],
+                color: Color.fromARGB(255, 9, 32, 15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -270,8 +291,6 @@ class _ClientScreenState extends State<ClientScreen> {
                     ],
                   ),
 
-                  SizedBox(height: 20),
-
                   if (!_isConnected) ...[
                     SizedBox(
                       width: double.infinity,
@@ -295,34 +314,6 @@ class _ClientScreenState extends State<ClientScreen> {
                       ),
                     ),
                   ],
-
-                  if (_isConnected) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _sendTestAction,
-                            icon: Icon(Icons.send),
-                            label: Text('Test Actie'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: _disconnect,
-                          icon: Icon(Icons.close),
-                          label: Text('Disconnect'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -332,6 +323,7 @@ class _ClientScreenState extends State<ClientScreen> {
               PlayerList(
                 playerCount: _bluetoothClient.playerCount,
                 playerIds: _bluetoothClient.playerIds,
+                playerInfo: _buildPlayerInfoList(),
               ),
               SizedBox(height: 16),
             ],
@@ -342,5 +334,33 @@ class _ClientScreenState extends State<ClientScreen> {
         ),
       ),
     );
+  }
+
+  /// Bouw player info lijst voor display
+  List<Map<String, String>> _buildPlayerInfoList() {
+    final List<Map<String, String>> playerInfo = [];
+
+    // Host info
+    if (_bluetoothClient.playerIds.contains('host')) {
+      playerInfo.add({
+        'playerId': 'host',
+        'name': _bluetoothClient.connectedHostName ?? 'Host',
+        'address': 'local',
+      });
+    }
+
+    // Client info
+    final playerNames = _bluetoothClient.playerNames;
+    for (String playerId in _bluetoothClient.playerIds) {
+      if (playerId != 'host') {
+        playerInfo.add({
+          'playerId': playerId,
+          'name': playerNames[playerId] ?? 'Unknown Player',
+          'address': '',
+        });
+      }
+    }
+
+    return playerInfo;
   }
 }
